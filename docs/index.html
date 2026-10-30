@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>standby-bige-ops</title>
+<meta name="description" content="Ta stack dort quand personne ne s'en sert et se réveille à la première visite. Moins de calcul payé pour rien, moins d'énergie dépensée.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* bige.dev palette and type */
+:root {
+  --ink-950: #0b0d10; --ink-900: #12151a; --ink-700: #252b36; --ink-600: #3a4354;
+  --accent: #3d9e8f; --accent-bright: #5ec4b4; --mist: #9aa3b2; --white: #ffffff; --text: #f3f5f8;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --on-bg: #10302b; --on-bd: #3d9e8f; --on-tx: #c9f0ea;
+  --wake-bg: #33290c; --wake-bd: #d4a72c; --wake-tx: #f6e2a6;
+  --off-bg: #12151a; --off-bd: #3a4354; --off-tx: #9aa3b2;
+  --edge-bg: #171b22; --edge-bd: #5ec4b4; --edge-tx: #f3f5f8;
+  --line-on: #5ec4b4; --line-wake: #d4a72c; --line-off: #3a4354;
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; }
+body { margin: 0; background: var(--ink-950); color: var(--text); font-family: var(--font-sans); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+main { max-width: 820px; margin: 0 auto; padding: clamp(2rem, 5vw, 3.5rem) 1.35rem 4rem; }
+.brand-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: .65rem .85rem; margin: 0 0 1rem; }
+.brand { font-family: var(--font-display); font-size: clamp(1.6rem, 5vw, 2.2rem); font-weight: 600; letter-spacing: -.03em; line-height: 1; margin: 0; color: var(--white); }
+.brand .ops { color: var(--accent-bright); }
+.brand-badge { font-family: var(--font-display); font-size: .7rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-bright); border: 1px solid rgba(94,196,180,.28); background: rgba(94,196,180,.06); padding: .2rem .45rem; line-height: 1.2; align-self: center; }
+h1 { font-family: var(--font-display); font-size: clamp(1.9rem, 5.5vw, 2.6rem); line-height: 1.15; letter-spacing: -.02em; margin: 0 0 14px; color: var(--white); }
+h2 { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: -.01em; margin: 56px 0 12px; color: var(--white); }
+h3 { font-family: var(--font-display); }
+.lead { font-size: clamp(1.05rem, 2.4vw, 1.2rem); font-weight: 500; color: var(--mist); margin: 0 0 12px; line-height: 1.45; }
+p, li { color: #d5dae2; }
+ul.arrows { list-style: none; padding: 0; }
+ul.arrows li { position: relative; padding-left: 1.1rem; margin: 0 0 .45rem; }
+ul.arrows li::before { content: "→"; position: absolute; left: 0; color: var(--accent-bright); font-size: .85rem; }
+code, pre { font-family: var(--font-mono); font-size: .88em; }
+pre { background: var(--ink-900); border: 1px solid var(--ink-700); border-radius: 10px; padding: 14px 16px; overflow-x: auto; color: #e6ebf1; }
+a { color: var(--accent-bright); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
+.card { background: var(--ink-900); border: 1px solid var(--ink-700); border-radius: 12px; padding: 18px 20px; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.grid h3 { margin: 0 0 6px; font-size: 1.05rem; color: var(--white); }
+.grid p { margin: 0; color: var(--mist); }
+.states { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 12px; }
+.states button { font-family: var(--font-display); font-size: .95rem; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--ink-600); background: transparent; color: var(--text); cursor: pointer; }
+.states button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--ink-950); font-weight: 600; }
+svg text { font-family: var(--font-sans); }
+.box rect { stroke-width: 1; }
+.on rect { fill: var(--on-bg); stroke: var(--on-bd); } .on text { fill: var(--on-tx); }
+.wake rect { fill: var(--wake-bg); stroke: var(--wake-bd); } .wake text { fill: var(--wake-tx); }
+.off rect { fill: var(--off-bg); stroke: var(--off-bd); } .off text { fill: var(--off-tx); }
+.edge rect { fill: var(--edge-bg); stroke: var(--edge-bd); } .edge text { fill: var(--edge-tx); }
+.title { font-size: 15px; font-weight: 600; } .sub { font-size: 13px; }
+.net { fill: none; stroke: var(--ink-600); stroke-dasharray: 6 5; }
+.legend { font-size: 13px; fill: var(--mist); }
+#caption { min-height: 3.2em; color: var(--mist); margin: 8px 0 0; }
+.day { position: relative; height: 34px; border-radius: 8px; background: var(--ink-900); border: 1px solid var(--ink-700); margin: 12px 0 6px; }
+.day span { position: absolute; top: 0; bottom: 0; background: var(--on-bg); border-left: 2px solid var(--on-bd); border-right: 2px solid var(--on-bd); }
+.hours { display: flex; justify-content: space-between; font-size: .8rem; color: var(--mist); font-family: var(--font-mono); }
+.note { font-size: .92rem; color: var(--mist); }
+footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--ink-700); font-size: .9rem; color: var(--mist); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+<div class="brand-row"><p class="brand">standby<span class="ops">-bige-ops</span></p><span class="brand-badge">Open source · en développement</span></div>
+<h1>Ta stack dort quand personne ne s'en sert.</h1>
+<p class="lead">Elle se réveille à la première visite, dans le bon ordre. Tu ne paies plus le calcul de machines qui tournent à vide, et le datacenter dépense moins d'énergie pour rien.</p>
+<p>Une toute petite VM, la gardienne, se place à côté de ta stack, derrière le même load balancer. Quand l'app tourne, elle ne fait rien. Quand personne ne s'en sert, elle met les machines en pause. Au prochain visiteur, elle les rallume et affiche une page d'attente qui suit le démarrage.</p>
+
+<h2>Le principe en trois états</h2>
+<div class="states" role="group" aria-label="État de la stack">
+  <button type="button" id="b-up" aria-pressed="true">Démarrée</button>
+  <button type="button" id="b-pause" aria-pressed="false">En veille</button>
+  <button type="button" id="b-wake" aria-pressed="false">Réveil</button>
+</div>
+<svg viewBox="0 0 680 470" width="100%" role="img" aria-labelledby="svg-title svg-desc">
+  <title id="svg-title">La stack derrière le load balancer, avec la gardienne</title>
+  <desc id="svg-desc">Le navigateur appelle le domaine de l'app. Le load balancer envoie le trafic à la VM app quand elle est saine, sinon à la gardienne, qui démarre les machines par l'API du cloud.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <rect class="net" x="40" y="120" width="600" height="250" rx="16"/>
+  <text class="legend" x="60" y="352">Réseau privé : aucune VM n'a d'IP publique</text>
+  <g class="box edge"><rect x="40" y="30" width="190" height="56" rx="8"/><text class="title" x="135" y="53" text-anchor="middle">Navigateur</text><text class="sub" x="135" y="73" text-anchor="middle">https://app.domaine.fr</text></g>
+  <g class="box edge"><rect x="290" y="30" width="180" height="56" rx="8"/><text class="title" x="380" y="53" text-anchor="middle">Load balancer</text><text class="sub" x="380" y="73" text-anchor="middle">TLS, health check</text></g>
+  <line x1="230" y1="58" x2="288" y2="58" stroke="var(--edge-bd)" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="380" y1="86" x2="380" y2="104" stroke="var(--edge-bd)" stroke-width="1.5"/>
+  <path id="e-lb-app" d="M380 104 L170 104 L170 158" fill="none" stroke-width="2" marker-end="url(#arrow)"/>
+  <path id="e-lb-g" d="M380 104 L510 104 L510 158" fill="none" stroke-width="2" marker-end="url(#arrow)"/>
+  <g id="n-app" class="box on"><rect x="70" y="160" width="200" height="56" rx="8"/><text class="title" x="170" y="183" text-anchor="middle">VM app</text><text id="s-app" class="sub" x="170" y="203" text-anchor="middle">app + sonde d'activité</text></g>
+  <g id="n-g" class="box off"><rect x="410" y="160" width="200" height="56" rx="8"/><text class="title" x="510" y="183" text-anchor="middle">VM gardienne</text><text id="s-g" class="sub" x="510" y="203" text-anchor="middle">hors rotation</text></g>
+  <line id="e-probe" x1="408" y1="188" x2="274" y2="188" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+  <path id="e-app-db" d="M170 216 L170 268" fill="none" stroke-width="2" marker-end="url(#arrow)"/>
+  <g id="n-db" class="box on"><rect x="70" y="270" width="240" height="56" rx="8"/><text class="title" x="190" y="293" text-anchor="middle">VMs de données</text><text id="s-db" class="sub" x="190" y="313" text-anchor="middle">bases, cache, recherche</text></g>
+  <path id="e-g-api" d="M510 216 L510 398" fill="none" stroke-width="2" marker-end="url(#arrow)"/>
+  <g class="box off"><rect x="410" y="400" width="200" height="56" rx="8"/><text class="title" x="510" y="423" text-anchor="middle">API du cloud</text><text class="sub" x="510" y="443" text-anchor="middle">démarrer, arrêter</text></g>
+  <g class="box on"><rect x="40" y="404" width="14" height="14" rx="3"/></g><text class="legend" x="62" y="416">allumée</text>
+  <g class="box wake"><rect x="130" y="404" width="14" height="14" rx="3"/></g><text class="legend" x="152" y="416">en démarrage</text>
+  <g class="box off"><rect x="260" y="404" width="14" height="14" rx="3"/></g><text class="legend" x="282" y="416">à l'arrêt</text>
+</svg>
+<p id="caption" aria-live="polite"></p>
+
+<h2>Une règle simple pour les horaires</h2>
+<p>Pendant tes plages horaires, la stack reste allumée, même sans trafic. En dehors, elle se met en pause après 60 minutes sans aucune requête, et se rallume à la visite suivante, toute seule ou sur un clic si tu préfères un bouton.</p>
+<div class="day" role="img" aria-label="Exemple : allumée de 8h à 12h puis de 14h à 18h">
+  <span style="left:33.33%;width:16.67%"></span><span style="left:58.33%;width:16.67%"></span>
+</div>
+<div class="hours" aria-hidden="true"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>24h</span></div>
+<pre><code>"schedule": {
+  "timezone": "Europe/Paris",
+  "days": ["mon", "tue", "wed", "thu", "fri"],
+  "awake": ["08:00-12:00", "14:00-18:00"]
+},
+"idle_after": "60m",
+"wake": { "on_visit": true, "button": false }</code></pre>
+<p class="note">Une visite la nuit réveille la stack une seule fois : les visiteurs suivants voient la progression, sans relancer le démarrage. <code>/robots.txt</code>, <code>/favicon.ico</code> et <code>/.well-known/</code> ne réveillent jamais rien, et des plafonds (réveils par jour, heures allumées par mois) bornent ce que les robots peuvent te coûter.</p>
+
+<h2>Pourquoi le faire</h2>
+<div class="grid">
+  <div class="card"><h3>Économie</h3><p>Une VM en pause ne paie plus son calcul. Exemple estimé : une stack de 3 VMs à 565 € HT par mois, dont 75 % de calcul, allumée en semaine de 9h à 18h, revient à environ 286 € par mois, gardienne comprise.</p></div>
+  <div class="card"><h3>Écologie</h3><p>Une VM en pause ne fait plus travailler de processeur. Le serveur consomme moins d'électricité et dégage moins de chaleur : il faut moins d'énergie et moins d'eau pour le refroidir, et la capacité libérée sert à d'autres.</p></div>
+  <div class="card"><h3>Sans mentir</h3><p>Les disques, les IP et le load balancer restent facturés pendant la pause. Une VM réservée est due quoi qu'il arrive. Nous ne publions aucun chiffre de CO₂ ou de litres d'eau par VM : il dépend du datacenter. Nous mesurons les heures où ta stack dort.</p></div>
+</div>
+
+<h2>Sûre par construction</h2>
+<ul class="arrows">
+  <li>La gardienne n'est jamais sur le chemin des requêtes quand l'app tourne : aucune perte de performance, aucun point de panne en plus.</li>
+  <li>Elle n'a pas d'IP publique. Elle ne parle qu'à l'API du cloud et aux machines de ta stack.</li>
+  <li>Sa clé ne sait que lire, démarrer et arrêter des machines, et elle refuse toute machine absente de son manifeste.</li>
+  <li>La page d'attente est servie avec une CSP stricte, sans JavaScript tiers, et ne dévoile aucun détail interne.</li>
+  <li>Un seul binaire Go, bibliothèque standard uniquement, sans télémétrie. Lis le <a href="https://github.com/simondelamarre/standby-bige-ops/blob/main/THREAT_MODEL.md">modèle de menace</a>.</li>
+</ul>
+
+<h2>Essaie-la en local</h2>
+<p>Il te faut seulement Docker. La démo lance un load balancer, une app, une base et la gardienne, avec une veille au bout d'une minute.</p>
+<pre><code>git clone https://github.com/simondelamarre/standby-bige-ops
+cd standby-bige-ops
+make test
+make local-up
+open http://localhost:8088</code></pre>
+
+<h2>Où en est le projet</h2>
+<p>Le cycle complet fonctionne en local avec Docker. Le pilote Outscale est en cours ; Scaleway et OVHcloud viendront ensuite. Ne l'utilise pas encore en production.</p>
+<p>Elle est conçue pour <a href="https://bige.dev">bige-ops</a>, qui génère sa configuration depuis ta simulation, mais elle n'en dépend pas : un manifeste et un fichier de configuration suffisent pour la forker.</p>
+
+<footer>standby-bige-ops · licence Apache-2.0 · <a href="https://github.com/simondelamarre/standby-bige-ops">code source</a></footer>
+</main>
+<script>
+(function () {
+  "use strict";
+  var ON = "var(--line-on)", WAKE = "var(--line-wake)", OFF = "var(--line-off)";
+  var S = {
+    up: { app: ["on", "app + sonde d'activité"], db: ["on", "bases, cache, recherche"], g: ["off", "hors rotation"],
+      e: { "e-lb-app": ON, "e-lb-g": null, "e-app-db": ON, "e-g-api": null, "e-probe": OFF },
+      cap: "Le load balancer envoie tout le trafic directement à l'app. La gardienne reste hors rotation : elle demande seulement à la sonde, par le réseau privé, quand la dernière requête est passée." },
+    pause: { app: ["off", "en pause"], db: ["off", "en pause, disques gardés"], g: ["on", "page d'attente"],
+      e: { "e-lb-app": null, "e-lb-g": ON, "e-app-db": null, "e-g-api": null, "e-probe": null },
+      cap: "Après 60 minutes sans trafic hors de tes horaires, les machines sont arrêtées proprement ; disques, images et données restent. La gardienne devient le seul backend sain : c'est elle qui accueille les visiteurs." },
+    wake: { app: ["wake", "démarrage…"], db: ["wake", "démarrage…"], g: ["on", "page d'attente"],
+      e: { "e-lb-app": null, "e-lb-g": ON, "e-app-db": WAKE, "e-g-api": WAKE, "e-probe": WAKE },
+      cap: "La première visite lance le réveil : les bases d'abord, puis l'app, chaque étape vérifiée. Les visiteurs voient la progression. Dès que l'app répond, le load balancer la remet en rotation et la page se recharge toute seule." }
+  };
+  function setState(k) {
+    var s = S[k];
+    [["n-app", "s-app", s.app], ["n-db", "s-db", s.db], ["n-g", "s-g", s.g]].forEach(function (n) {
+      document.getElementById(n[0]).setAttribute("class", "box " + n[2][0]);
+      document.getElementById(n[1]).textContent = n[2][1];
+    });
+    Object.keys(s.e).forEach(function (id) {
+      var el = document.getElementById(id), c = s.e[id];
+      el.setAttribute("stroke", c || OFF);
+      el.setAttribute("opacity", c ? "1" : "0.4");
+      if (c && id !== "e-probe") el.removeAttribute("stroke-dasharray"); else el.setAttribute("stroke-dasharray", "4 4");
+    });
+    document.getElementById("caption").textContent = s.cap;
+    ["up", "pause", "wake"].forEach(function (b) {
+      document.getElementById("b-" + b).setAttribute("aria-pressed", String(b === k));
+    });
+  }
+  ["up", "pause", "wake"].forEach(function (k) {
+    document.getElementById("b-" + k).addEventListener("click", function () { setState(k); });
+  });
+  setState("up");
+})();
+</script>
+</body>
+</html>
