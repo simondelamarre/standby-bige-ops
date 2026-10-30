@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/simondelamarre/standby-bige-ops/schemas/config.schema.json",
+  "title": "standby configuration",
+  "description": "How the guardian behaves. Every field has a default; unknown fields are rejected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "tap"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "listen": {
+      "type": "string",
+      "default": ":8080",
+      "description": "Traffic port: waiting page, assets and status."
+    },
+    "health_listen": {
+      "type": "string",
+      "default": ":9090",
+      "description": "Health port probed by the load balancer; healthy only while the app sleeps."
+    },
+    "manifest": {
+      "type": "string",
+      "default": "manifest.json",
+      "description": "Relative to this file."
+    },
+    "state": {
+      "type": "string",
+      "default": "state.json",
+      "description": "Wake history and counters. Relative to this file."
+    },
+    "driver": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "enum": [
+            "docker"
+          ],
+          "default": "docker"
+        },
+        "docker_socket": {
+          "type": "string",
+          "default": "/var/run/docker.sock"
+        }
+      }
+    },
+    "schedule": {
+      "description": "Optional awake window. Inside it the stack stays up; outside it, it sleeps after idle_after without traffic. Omit it for on-demand only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timezone",
+        "days",
+        "awake"
+      ],
+      "properties": {
+        "timezone": {
+          "type": "string",
+          "examples": [
+            "Europe/Paris"
+          ]
+        },
+        "days": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "mon",
+              "tue",
+              "wed",
+              "thu",
+              "fri",
+              "sat",
+              "sun"
+            ]
+          }
+        },
+        "awake": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Awake ranges for each listed day. Inside them the stack stays up even without traffic.",
+          "items": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]-(([01][0-9]|2[0-3]):[0-5][0-9]|24:00)$"
+          },
+          "examples": [
+            [
+              "08:00-12:00",
+              "14:00-18:00"
+            ]
+          ]
+        }
+      }
+    },
+    "idle_after": {
+      "type": "string",
+      "default": "60m",
+      "description": "Go duration. Sleep only after this long without any traffic. At least 1m."
+    },
+    "lb_settle": {
+      "type": "string",
+      "default": "15s",
+      "description": "Time for the load balancer to see the guardian healthy before machines stop."
+    },
+    "tick": {
+      "type": "string",
+      "default": "10s",
+      "description": "How often the guardian reconciles."
+    },
+    "wake": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "on_visit": {
+          "type": "boolean",
+          "default": true,
+          "description": "The first visit wakes the stack."
+        },
+        "button": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show a start button on the waiting page."
+        },
+        "schedule": {
+          "type": "boolean",
+          "default": true,
+          "description": "Wake when the awake window opens."
+        }
+      }
+    },
+    "caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "wakes_per_day": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10
+        },
+        "awake_hours_per_month": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 744,
+          "default": 300
+        }
+      }
+    },
+    "tap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Activity endpoint of the probe on the app VM, e.g. http://app:9090/activity."
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "description": "Required: without the activity probe the guardian cannot tell whether someone uses the app."
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "lang": {
+          "enum": [
+            "fr",
+            "en"
+          ],
+          "default": "fr"
+        },
+        "contact": {
+          "type": "string",
+          "pattern": "^(https://|mailto:)",
+          "maxLength": 300
+        },
+        "logo": {
+          "type": "string",
+          "description": "PNG or SVG file, at most 64 KiB. Relative to this file."
+        },
+        "primary_color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#2563eb"
+        },
+        "background_color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#0b1020"
+        },
+        "text_color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#e5e7eb"
+        },
+        "show_eta": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  }
+}

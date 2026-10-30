@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/simondelamarre/standby-bige-ops/schemas/status.schema.json",
+  "title": "standby public status",
+  "description": "Served at /_standby/status to anyone. It never contains machine ids, addresses or error text.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["phase", "step", "steps", "can_wake"],
+  "properties": {
+    "phase": { "enum": ["unknown", "asleep", "waking", "awake", "sleeping", "partial", "failed"] },
+    "step": { "type": "integer", "minimum": 0 },
+    "steps": { "type": "integer", "minimum": 0 },
+    "eta_seconds": { "type": "integer", "minimum": 0 },
+    "can_wake": { "type": "boolean" },
+    "reason": { "enum": ["cap_reached", "error"] }
+  }
+}
