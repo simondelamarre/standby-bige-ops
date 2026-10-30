@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "stack": "my-stack",
+  "provider": "outscale",
+  "waves": [
+    [
+      { "id": "i-11111111", "role": "mongodb", "probe": { "kind": "tcp", "target": "10.0.10.20:27017" } },
+      { "id": "i-22222222", "role": "weaviate", "probe": { "kind": "tcp", "target": "10.0.10.30:8080" } }
+    ],
+    [
+      { "id": "i-33333333", "role": "app" }
+    ]
+  ],
+  "app_probe": { "kind": "http", "target": "http://10.0.10.10:9090/health" }
+}

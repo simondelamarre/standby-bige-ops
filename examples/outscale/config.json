@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "listen": ":8080",
+  "health_listen": ":9090",
+  "manifest": "manifest.json",
+  "state": "/var/lib/standby/state.json",
+  "driver": {
+    "name": "outscale",
+    "region": "eu-west-2",
+    "credentials_file": "/etc/standby/outscale.json"
+  },
+  "schedule": {
+    "timezone": "Europe/Paris",
+    "days": ["mon", "tue", "wed", "thu", "fri"],
+    "awake": ["08:00-12:00", "14:00-18:00"]
+  },
+  "idle_after": "60m",
+  "lb_settle": "15s",
+  "wake": { "on_visit": true, "button": false, "schedule": true },
+  "caps": { "wakes_per_day": 10, "awake_hours_per_month": 300 },
+  "tap": { "url": "http://10.0.10.10:9090/activity" },
+  "page": { "lang": "fr", "contact": "mailto:ops@example.com" }
+}

@@ -46,13 +46,14 @@ fork only needs a manifest and a configuration file.
 
 ## Status
 
-Early development. The Docker driver runs the whole cycle locally; the Outscale
-driver is next. Do not use it in production yet.
+Early development. The Docker driver runs the whole cycle locally and the
+Outscale driver is written; its first run on a real account is next. Do not use
+it in production yet. Example configuration: [`examples/outscale`](examples/outscale).
 
 | Driver | Status |
 |---|---|
 | `docker` (local tests) | Working |
-| `outscale` | Planned (StopVms / StartVms, LBU) |
+| `outscale` | Implemented (ReadVms, StartVms, StopVms), signing checked against bige-ops; first run on a real account pending |
 | `ovh`, `scaleway` | Later |
 
 ## Try it locally
