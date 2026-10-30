@@ -39,6 +39,19 @@ type Status struct {
 	ETASeconds int    `json:"eta_seconds,omitempty"`
 	CanWake    bool   `json:"can_wake"`
 	Reason     string `json:"reason,omitempty"`
+	// Only with page.show_setup.
+	SleepInSeconds *int   `json:"sleep_in_seconds,omitempty"`
+	Setup          *Setup `json:"setup,omitempty"`
+}
+
+// Setup is the part of the configuration a visitor may see.
+type Setup struct {
+	IdleAfterSeconds int      `json:"idle_after_seconds"`
+	Timezone         string   `json:"timezone,omitempty"`
+	Days             []string `json:"days,omitempty"`
+	Awake            []string `json:"awake,omitempty"`
+	WakeOnVisit      bool     `json:"wake_on_visit"`
+	WakeButton       bool     `json:"wake_button"`
 }
 
 type Options struct {
@@ -104,6 +117,30 @@ func (c *Controller) Status() Status {
 	st.CanWake, st.Reason = c.canWakeLocked(now)
 	if c.phase == Failed {
 		st.Reason = "error"
+	}
+	cfg := c.opt.Config
+	if cfg.Page.ShowSetup {
+		st.Setup = &Setup{
+			IdleAfterSeconds: int(cfg.IdleAfter.Seconds()),
+			WakeOnVisit:      cfg.Wake.OnVisit,
+			WakeButton:       cfg.Wake.Button,
+		}
+		if s := cfg.Schedule; s != nil {
+			st.Setup.Timezone, st.Setup.Days, st.Setup.Awake = s.Timezone, s.Days, s.Awake
+		}
+		if c.phase == Awake && !c.inWindow {
+			since := c.lastActivity
+			if c.readyAt.After(since) {
+				since = c.readyAt
+			}
+			if !since.IsZero() {
+				left := int((cfg.IdleAfter.Duration - now.Sub(since)).Seconds())
+				st.SleepInSeconds = &left
+				if left < 0 {
+					*st.SleepInSeconds = 0
+				}
+			}
+		}
 	}
 	return st
 }

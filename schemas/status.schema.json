@@ -5,13 +5,86 @@
   "description": "Served at /_standby/status to anyone. It never contains machine ids, addresses or error text.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["phase", "step", "steps", "can_wake"],
+  "required": [
+    "phase",
+    "step",
+    "steps",
+    "can_wake"
+  ],
   "properties": {
-    "phase": { "enum": ["unknown", "asleep", "waking", "awake", "sleeping", "partial", "failed"] },
-    "step": { "type": "integer", "minimum": 0 },
-    "steps": { "type": "integer", "minimum": 0 },
-    "eta_seconds": { "type": "integer", "minimum": 0 },
-    "can_wake": { "type": "boolean" },
-    "reason": { "enum": ["cap_reached", "error"] }
+    "phase": {
+      "enum": [
+        "unknown",
+        "asleep",
+        "waking",
+        "awake",
+        "sleeping",
+        "partial",
+        "failed"
+      ]
+    },
+    "step": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "steps": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "eta_seconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "can_wake": {
+      "type": "boolean"
+    },
+    "reason": {
+      "enum": [
+        "cap_reached",
+        "error"
+      ]
+    },
+    "sleep_in_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "With page.show_setup, while awake outside the awake ranges: seconds before sleep if no traffic arrives."
+    },
+    "setup": {
+      "description": "With page.show_setup only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "idle_after_seconds",
+        "wake_on_visit",
+        "wake_button"
+      ],
+      "properties": {
+        "idle_after_seconds": {
+          "type": "integer",
+          "minimum": 60
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "awake": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "wake_on_visit": {
+          "type": "boolean"
+        },
+        "wake_button": {
+          "type": "boolean"
+        }
+      }
+    }
   }
 }

@@ -7,6 +7,7 @@
   var bar = document.getElementById("bar");
   var statusEl = document.getElementById("status");
   var etaEl = document.getElementById("eta");
+  var btn = document.getElementById("wake-btn");
   var loadedAt = Date.now();
 
   function duration(s) {
@@ -16,6 +17,7 @@
   function label(st) {
     if (st.phase === "failed") return d.tError;
     if (st.phase === "sleeping") return d.tSleep;
+    if (st.phase === "asleep" && st.can_wake) return d.tAsleep;
     if (!st.can_wake && st.phase !== "waking") return d.tCap;
     if (st.phase === "waking" && st.steps > 0) {
       if (Date.now() - loadedAt > 10 * 60 * 1000) return d.tSlow;
@@ -44,6 +46,7 @@
           window.location.reload();
           return;
         }
+        if (btn) btn.disabled = !st.can_wake || (st.phase !== "asleep" && st.phase !== "failed");
         bar.value = st.steps > 0 ? Math.round((100 * st.step) / st.steps) : 0;
         statusEl.textContent = label(st);
         etaEl.textContent = d.showEta === "true" && st.eta_seconds ? d.tEta.replace("{s}", duration(st.eta_seconds)) : "";

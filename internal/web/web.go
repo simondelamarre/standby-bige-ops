@@ -45,6 +45,7 @@ type Controller interface {
 type Server struct {
 	ctrl   Controller
 	page   config.Page
+	setup  []string
 	wake   config.Wake
 	text   texts
 	tmpl   *template.Template
@@ -73,6 +74,9 @@ func New(ctrl Controller, cfg *config.Config, logoDir string) (*Server, error) {
 	s := &Server{
 		ctrl: ctrl, page: cfg.Page, wake: cfg.Wake, text: textsFor(cfg.Page.Lang),
 		tmpl: tmpl, js: js, css: stylesheet(cfg.Page), key: key, Now: time.Now,
+	}
+	if cfg.Page.ShowSetup {
+		s.setup = setupLines(cfg, s.text)
 	}
 	if cfg.Page.Logo != "" {
 		path := cfg.Page.Logo
@@ -200,6 +204,7 @@ func (s *Server) visit(w http.ResponseWriter, r *http.Request) {
 	data := pageData{
 		Lang: s.page.Lang, Title: s.page.Title, Message: s.page.Message, Contact: s.page.Contact,
 		HasLogo: s.logo != nil, ShowETA: s.page.ShowETA, Visit: s.wake.OnVisit, T: s.text,
+		Setup: s.setup,
 	}
 	if data.Title == "" {
 		data.Title = s.text.DefaultTitle
@@ -264,7 +269,35 @@ type pageData struct {
 	HasLogo, ShowETA, Visit       bool
 	Button                        bool
 	Token                         string
+	Setup                         []string
 	T                             texts
+}
+
+// setupLines describes the schedule and idle rule in plain words.
+func setupLines(cfg *config.Config, t texts) []string {
+	lines := []string{fmt.Sprintf(t.IdleRule, humanDuration(cfg.IdleAfter.Duration))}
+	if cfg.Wake.OnVisit {
+		lines = append(lines, t.WakeVisit)
+	}
+	if cfg.Wake.Button {
+		lines = append(lines, t.WakeButton)
+	}
+	if s := cfg.Schedule; s != nil {
+		lines = append(lines, fmt.Sprintf(t.Ranges, strings.Join(s.Awake, ", "), strings.Join(s.Days, " "), s.Timezone))
+	} else {
+		lines = append(lines, t.NoRanges)
+	}
+	return lines
+}
+
+func humanDuration(d time.Duration) string {
+	if d < time.Hour {
+		return fmt.Sprintf("%d min", int(d.Minutes()))
+	}
+	if d%time.Hour == 0 {
+		return fmt.Sprintf("%d h", int(d.Hours()))
+	}
+	return fmt.Sprintf("%d h %02d", int(d.Hours()), int(d.Minutes())%60)
 }
 
 // stylesheet only interpolates colours already validated as #rrggbb.
@@ -284,5 +317,9 @@ button{margin-top:20px;background:var(--primary);color:#fff;border:0;border-radi
 button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
 a{color:var(--primary)}
 .contact{margin-top:24px;font-size:.9rem}
+button:disabled{opacity:.45;cursor:default}
+.setup{margin:28px 0 0;padding:14px 16px;border:1px solid rgba(127,127,127,.35);border-radius:8px;text-align:left;font-size:.9rem}
+.setup h2{font-size:.95rem;margin:0 0 6px}
+.setup ul{margin:0;padding-left:18px}
 `, p.Primary, p.Background, p.Text))
 }

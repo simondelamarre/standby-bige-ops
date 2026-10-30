@@ -183,3 +183,19 @@ func TestLogoIsSandboxed(t *testing.T) {
 		t.Fatal("accepted a logo that is neither PNG nor SVG")
 	}
 }
+
+func TestShowSetupDescribesTheRules(t *testing.T) {
+	s, ctrl := newServer(t, func(c *config.Config) {
+		c.Wake.OnVisit, c.Wake.Button, c.Page.ShowSetup = false, true, true
+		c.Schedule = &config.Schedule{Timezone: "Europe/Paris", Days: []string{"mon", "fri"}, Awake: []string{"08:00-12:00", "14:00-18:00"}}
+	})
+	body := get(s.Traffic(), "/", "text/html").Body.String()
+	for _, want := range []string{"Mise en pause après 1 h sans trafic", "Réveil avec le bouton Démarrer", "08:00-12:00, 14:00-18:00", "Clique sur Démarrer"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page does not say %q", want)
+		}
+	}
+	if len(ctrl.wakes) != 0 {
+		t.Fatalf("a visit woke the stack in button mode: %v", ctrl.wakes)
+	}
+}

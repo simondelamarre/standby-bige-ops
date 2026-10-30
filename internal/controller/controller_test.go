@@ -189,3 +189,24 @@ func TestWakeCapPerDay(t *testing.T) {
 		t.Fatalf("status = %+v", st)
 	}
 }
+
+func TestStatusCountsDownToSleepWhenSetupIsShown(t *testing.T) {
+	r := newRig(t, func(c *config.Config) { c.Page.ShowSetup = true }, nil)
+	if st := r.ctrl.Status(); st.Setup == nil || st.Setup.IdleAfterSeconds != 3600 || st.SleepInSeconds != nil {
+		t.Fatalf("asleep status = %+v", st)
+	}
+	r.ctrl.RequestWake("button")
+	r.waitPhase(t, Awake)
+	r.clock.Add(20 * time.Minute)
+	st := r.ctrl.Status()
+	if st.SleepInSeconds == nil || *st.SleepInSeconds != 40*60 {
+		t.Fatalf("sleep_in_seconds = %v, want 2400", st.SleepInSeconds)
+	}
+}
+
+func TestStatusHidesSetupByDefault(t *testing.T) {
+	r := newRig(t, nil, nil)
+	if st := r.ctrl.Status(); st.Setup != nil || st.SleepInSeconds != nil {
+		t.Fatalf("status exposes the setup: %+v", st)
+	}
+}

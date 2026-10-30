@@ -4,7 +4,9 @@ package web
 type texts struct {
 	DefaultTitle, DefaultMessage                        string
 	Starting, Step, ETA, Ready, Slow, Cap, Error, Sleep string
-	Button, Contact, Progress                           string
+	Asleep, Button, Contact, Progress                   string
+	// Setup lines, shown with page.show_setup.
+	SetupTitle, IdleRule, WakeVisit, WakeButton, Ranges, NoRanges string
 }
 
 func textsFor(lang string) texts {
@@ -20,9 +22,16 @@ func textsFor(lang string) texts {
 			Cap:            "Automatic wake-up is paused for now.",
 			Error:          "Start-up ran into a problem.",
 			Sleep:          "Going to sleep…",
+			Asleep:         "The stack is asleep. Press Start to wake it up.",
 			Button:         "Start",
 			Contact:        "Contact the team",
 			Progress:       "Start-up progress",
+			SetupTitle:     "How this stack sleeps",
+			IdleRule:       "Goes to sleep after %s without traffic",
+			WakeVisit:      "Wakes up on the first visit",
+			WakeButton:     "Wakes up with the Start button",
+			Ranges:         "Always up %s (%s, %s)",
+			NoRanges:       "No awake hours: on demand only",
 		}
 	}
 	return texts{
@@ -36,8 +45,15 @@ func textsFor(lang string) texts {
 		Cap:            "Le réveil automatique est en pause pour le moment.",
 		Error:          "Le démarrage a rencontré un problème.",
 		Sleep:          "Mise en veille en cours…",
+		Asleep:         "La stack est en pause. Clique sur Démarrer pour la réveiller.",
 		Button:         "Démarrer",
 		Contact:        "Contacter l'équipe",
 		Progress:       "Progression du démarrage",
+		SetupTitle:     "Comment cette stack se met en pause",
+		IdleRule:       "Mise en pause après %s sans trafic",
+		WakeVisit:      "Réveil à la première visite",
+		WakeButton:     "Réveil avec le bouton Démarrer",
+		Ranges:         "Toujours allumée %s (%s, %s)",
+		NoRanges:       "Pas de plage horaire : réveil à la demande",
 	}
 }

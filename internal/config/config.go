@@ -90,6 +90,8 @@ type Page struct {
 	Background string `json:"background_color"`
 	Text       string `json:"text_color"`
 	ShowETA    bool   `json:"show_eta"`
+	// ShowSetup publishes the schedule and idle rule on the page and in the status.
+	ShowSetup bool `json:"show_setup"`
 }
 
 // Default returns the configuration used for every field the file leaves out.
