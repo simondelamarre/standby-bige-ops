@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="/_standby/style.css">
+<noscript><meta http-equiv="refresh" content="60"></noscript>
+<script src="/_standby/app.js" defer></script>
+</head>
+<body>
+<main id="standby"
+  data-visit="{{.Visit}}" data-show-eta="{{.ShowETA}}"
+  data-t-starting="{{.T.Starting}}" data-t-step="{{.T.Step}}" data-t-eta="{{.T.ETA}}"
+  data-t-ready="{{.T.Ready}}" data-t-slow="{{.T.Slow}}" data-t-cap="{{.T.Cap}}"
+  data-t-error="{{.T.Error}}" data-t-sleep="{{.T.Sleep}}">
+  {{if .HasLogo}}<img class="logo" src="/_standby/logo" alt="">{{end}}
+  <h1>{{.Title}}</h1>
+  <p class="message">{{.Message}}</p>
+  <progress id="bar" max="100" value="0" aria-label="{{.T.Progress}}"></progress>
+  <p id="status" class="status" role="status" aria-live="polite">{{.T.Starting}}</p>
+  <p id="eta" class="eta"></p>
+  {{if .Button}}<form method="post" action="/_standby/wake"><input type="hidden" name="token" value="{{.Token}}"><button type="submit">{{.T.Button}}</button></form>{{end}}
+  {{if .Contact}}<p class="contact"><a href="{{.Contact}}">{{.T.Contact}}</a></p>{{end}}
+</main>
+</body>
+</html>
