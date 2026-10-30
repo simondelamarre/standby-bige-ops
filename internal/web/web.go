@@ -206,11 +206,24 @@ func (s *Server) visit(w http.ResponseWriter, r *http.Request) {
 		HasLogo: s.logo != nil, ShowETA: s.page.ShowETA, Visit: s.wake.OnVisit, T: s.text,
 		Setup: s.setup,
 	}
+	name := s.page.AppName
 	if data.Title == "" {
 		data.Title = s.text.DefaultTitle
+		if name != "" {
+			data.Title = fmt.Sprintf(s.text.NamedTitle, name)
+		}
 	}
 	if data.Message == "" {
 		data.Message = s.text.DefaultMessage
+		if name != "" {
+			data.Message = fmt.Sprintf(s.text.NamedMessage, name)
+		}
+	}
+	if s.page.ShowReason {
+		data.Reason = s.page.Reason
+		if data.Reason == "" {
+			data.Reason = s.text.DefaultReason
+		}
 	}
 	if s.wake.Button {
 		data.Button = true
@@ -266,6 +279,7 @@ func (s *Server) validToken(tok string) bool {
 
 type pageData struct {
 	Lang, Title, Message, Contact string
+	Reason                        string
 	HasLogo, ShowETA, Visit       bool
 	Button                        bool
 	Token                         string
@@ -283,7 +297,11 @@ func setupLines(cfg *config.Config, t texts) []string {
 		lines = append(lines, t.WakeButton)
 	}
 	if s := cfg.Schedule; s != nil {
-		lines = append(lines, fmt.Sprintf(t.Ranges, strings.Join(s.Awake, ", "), strings.Join(s.Days, " "), s.Timezone))
+		days := make([]string, len(s.Days))
+		for i, d := range s.Days {
+			days[i] = t.Day(d)
+		}
+		lines = append(lines, fmt.Sprintf(t.Ranges, strings.Join(s.Awake, ", "), strings.Join(days, " "), s.Timezone))
 	} else {
 		lines = append(lines, t.NoRanges)
 	}
@@ -310,13 +328,18 @@ main{width:100%%;max-width:480px;text-align:center}
 .logo{max-width:96px;max-height:96px;margin:0 auto 16px;display:block}
 h1{font-size:1.5rem;font-weight:600;margin:0 0 8px}
 .message{margin:0 0 24px;opacity:.85}
-progress{width:100%%;height:8px;accent-color:var(--primary)}
+progress{-webkit-appearance:none;appearance:none;width:100%%;height:8px;border:0;border-radius:4px;background:rgba(127,127,127,.25);overflow:hidden}
+progress::-webkit-progress-bar{background:rgba(127,127,127,.25);border-radius:4px}
+progress::-webkit-progress-value{background:var(--primary);border-radius:4px}
+progress::-moz-progress-bar{background:var(--primary);border-radius:4px}
 .status{margin:12px 0 0;font-weight:500}
 .eta{margin:4px 0 0;opacity:.7;font-size:.9rem;min-height:1.4em}
 button{margin-top:20px;background:var(--primary);color:#fff;border:0;border-radius:6px;padding:10px 20px;font:inherit;cursor:pointer}
 button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
 a{color:var(--primary)}
 .contact{margin-top:24px;font-size:.9rem}
+.reason{display:flex;gap:10px;align-items:flex-start;text-align:left;margin:0 0 24px;padding:12px 14px;border-radius:8px;background:rgba(127,127,127,.1);font-size:.92rem;line-height:1.5}
+.reason svg{flex:none;width:18px;height:18px;margin-top:2px;color:var(--primary)}
 button:disabled{opacity:.45;cursor:default}
 .setup{margin:28px 0 0;padding:14px 16px;border:1px solid rgba(127,127,127,.35);border-radius:8px;text-align:left;font-size:.9rem}
 .setup h2{font-size:.95rem;margin:0 0 6px}

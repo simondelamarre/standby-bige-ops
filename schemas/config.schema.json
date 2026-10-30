@@ -228,6 +228,20 @@
           "type": "boolean",
           "default": false,
           "description": "Show the schedule and idle rule on the waiting page and add them, with the time left before sleep, to the public status."
+        },
+        "app_name": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "Personalises the default title and message, e.g. \"On rallume Acme Board\"."
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Why the app sleeps. Empty: built-in text about energy and resources."
+        },
+        "show_reason": {
+          "type": "boolean",
+          "default": true
         }
       }
     }

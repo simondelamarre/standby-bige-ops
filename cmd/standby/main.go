@@ -20,6 +20,7 @@ import (
 	"github.com/simondelamarre/standby-bige-ops/internal/driver/docker"
 	"github.com/simondelamarre/standby-bige-ops/internal/driver/outscale"
 	"github.com/simondelamarre/standby-bige-ops/internal/manifest"
+	"github.com/simondelamarre/standby-bige-ops/internal/preview"
 	"github.com/simondelamarre/standby-bige-ops/internal/probe"
 	"github.com/simondelamarre/standby-bige-ops/internal/schedule"
 	"github.com/simondelamarre/standby-bige-ops/internal/sequencer"
@@ -36,6 +37,7 @@ commands:
   run       run the guardian (--config config.json)
   tap       run the activity probe next to the app
   validate  check a configuration and its manifest
+  preview   serve the waiting page with a simulated wake-up (--config config.json)
   version   print the version
 `
 
@@ -52,6 +54,8 @@ func main() {
 		err = runTap(os.Args[2:])
 	case "validate":
 		err = validate(os.Args[2:])
+	case "preview":
+		err = runPreview(os.Args[2:])
 	case "version":
 		fmt.Println(version)
 	default:
@@ -243,6 +247,43 @@ func runTap(args []string) error {
 		}
 	}()
 	log.Info("tap started", "version", version, "app_port", *port)
+	select {
+	case <-ctx.Done():
+		shutdown([]*http.Server{srv})
+		return nil
+	case err := <-errc:
+		return err
+	}
+}
+
+// runPreview needs only the configuration: no manifest, no machine, no key.
+func runPreview(args []string) error {
+	fs := flag.NewFlagSet("preview", flag.ContinueOnError)
+	path := fs.String("config", "config.json", "configuration file")
+	listen := fs.String("listen", "127.0.0.1:8099", "address to serve the preview on")
+	wake := fs.Duration("wake", 8*time.Second, "length of the simulated wake-up")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	cfg, err := config.Load(*path)
+	if err != nil {
+		return err
+	}
+	ctrl := preview.New(3, *wake)
+	page, err := web.New(ctrl, cfg, filepath.Dir(*path))
+	if err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	srv := newServer(*listen, preview.Handler(ctrl, page.Traffic()))
+	errc := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			errc <- err
+		}
+	}()
+	fmt.Printf("preview of the waiting page on http://%s (Ctrl+C to stop)\n", *listen)
 	select {
 	case <-ctx.Done():
 		shutdown([]*http.Server{srv})

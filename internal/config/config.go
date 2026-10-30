@@ -95,6 +95,11 @@ type Page struct {
 	ShowETA    bool   `json:"show_eta"`
 	// ShowSetup publishes the schedule and idle rule on the page and in the status.
 	ShowSetup bool `json:"show_setup"`
+	// AppName personalises the default title and message.
+	AppName string `json:"app_name,omitempty"`
+	// Reason explains why the app sleeps; empty uses the built-in text.
+	Reason     string `json:"reason,omitempty"`
+	ShowReason bool   `json:"show_reason"`
 }
 
 // Default returns the configuration used for every field the file leaves out.
@@ -117,6 +122,7 @@ func Default() Config {
 			Background: "#0b1020",
 			Text:       "#e5e7eb",
 			ShowETA:    true,
+			ShowReason: true,
 		},
 	}
 }
@@ -227,6 +233,9 @@ func (c *Config) Validate() error {
 	}
 	if len(p.Title) > 80 || len(p.Message) > 500 {
 		add("page.title is limited to 80 characters and page.message to 500")
+	}
+	if len(p.AppName) > 60 || len(p.Reason) > 300 {
+		add("page.app_name is limited to 60 characters and page.reason to 300")
 	}
 	if p.Contact != "" && !strings.HasPrefix(p.Contact, "https://") && !strings.HasPrefix(p.Contact, "mailto:") {
 		add("page.contact must start with https:// or mailto:")

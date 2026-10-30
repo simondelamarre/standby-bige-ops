@@ -190,12 +190,50 @@ func TestShowSetupDescribesTheRules(t *testing.T) {
 		c.Schedule = &config.Schedule{Timezone: "Europe/Paris", Days: []string{"mon", "fri"}, Awake: []string{"08:00-12:00", "14:00-18:00"}}
 	})
 	body := get(s.Traffic(), "/", "text/html").Body.String()
-	for _, want := range []string{"Mise en pause après 1 h sans trafic", "Réveil avec le bouton Démarrer", "08:00-12:00, 14:00-18:00", "Clique sur Démarrer"} {
+	for _, want := range []string{"Mise en pause après 1 h sans trafic", "Réveil avec le bouton Démarrer", "08:00-12:00, 14:00-18:00 (lun ven, Europe/Paris)", "Clique sur Démarrer"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page does not say %q", want)
 		}
 	}
 	if len(ctrl.wakes) != 0 {
 		t.Fatalf("a visit woke the stack in button mode: %v", ctrl.wakes)
+	}
+}
+
+func TestPageIsPersonalised(t *testing.T) {
+	dir := t.TempDir()
+	png := []byte("\x89PNG\r\n\x1a\nrest")
+	if err := os.WriteFile(filepath.Join(dir, "logo.png"), png, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Default()
+	cfg.Tap.URL = "http://app:9090/activity"
+	cfg.Page.AppName = "TenderCrunch"
+	cfg.Page.Logo = "logo.png"
+	cfg.Page.Primary = "#3d9e8f"
+	s, err := New(&fakeCtrl{status: controller.Status{Phase: controller.Asleep, CanWake: true}}, &cfg, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := get(s.Traffic(), "/", "text/html").Body.String()
+	for _, want := range []string{"On rallume TenderCrunch", "TenderCrunch s&#39;était mis en veille", "ne pas dépenser d&#39;énergie", `rel="icon" href="/_standby/logo"`, `class="logo"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page does not contain %q", want)
+		}
+	}
+	if css := get(s.Traffic(), "/_standby/style.css", "").Body.String(); !strings.Contains(css, "--primary:#3d9e8f") {
+		t.Errorf("colour missing from the stylesheet")
+	}
+}
+
+func TestReasonCanBeReplacedOrHidden(t *testing.T) {
+	s, _ := newServer(t, func(c *config.Config) { c.Page.Reason = "Pour la planète <b>et</b> ta facture." })
+	body := get(s.Traffic(), "/", "text/html").Body.String()
+	if !strings.Contains(body, "Pour la planète &lt;b&gt;et&lt;/b&gt; ta facture.") {
+		t.Fatal("custom reason missing or not escaped")
+	}
+	s, _ = newServer(t, func(c *config.Config) { c.Page.ShowReason = false })
+	if body := get(s.Traffic(), "/", "text/html").Body.String(); strings.Contains(body, `class="reason"`) {
+		t.Fatal("reason shown although show_reason is false")
 	}
 }
