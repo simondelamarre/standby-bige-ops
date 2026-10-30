@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "stack": "standby-demo",
+  "provider": "docker",
+  "waves": [
+    [
+      { "id": "standby-demo-db", "role": "redis", "probe": { "kind": "tcp", "target": "db:6379" } }
+    ],
+    [
+      { "id": "standby-demo-app", "role": "app" },
+      { "id": "standby-demo-tap", "role": "tap" }
+    ]
+  ],
+  "app_probe": { "kind": "http", "target": "http://app:9090/health" }
+}

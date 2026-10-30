@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "listen": ":8080",
+  "health_listen": ":9090",
+  "manifest": "manifest.json",
+  "state": "/data/state.json",
+  "driver": { "name": "docker", "docker_socket": "/var/run/docker.sock" },
+  "idle_after": "1m",
+  "lb_settle": "5s",
+  "tick": "5s",
+  "wake": { "on_visit": true, "button": false, "schedule": true },
+  "caps": { "wakes_per_day": 50, "awake_hours_per_month": 300 },
+  "tap": { "url": "http://app:9090/activity" },
+  "page": { "lang": "fr", "contact": "mailto:ops@example.com", "show_eta": true }
+}

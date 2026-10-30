@@ -1,0 +1,45 @@
+# Local demo of the full cycle. Caddy stands in for the cloud load balancer:
+# it sends traffic to the app while the app is healthy, to the guardian otherwise.
+name: standby-demo
+
+services:
+  lb:
+    image: caddy:2.11.7-alpine
+    container_name: standby-demo-lb
+    ports:
+      - "127.0.0.1:8088:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    restart: unless-stopped
+
+  # The stack the guardian drives. No restart policy: the guardian decides.
+  db:
+    image: redis:8.8.4-alpine
+    container_name: standby-demo-db
+
+  app:
+    image: traefik/whoami:v1.12.0
+    container_name: standby-demo-app
+    command: ["--port", "3000"]
+
+  tap:
+    build: ../..
+    container_name: standby-demo-tap
+    command: ["tap", "--app-port", "3000", "--app-health", "/health", "--listen", ":9090"]
+    # Shares the app's network namespace, like a process on the app VM.
+    network_mode: "service:app"
+    depends_on: [app]
+
+  guardian:
+    build: ../..
+    container_name: standby-demo-guardian
+    command: ["run", "--config", "/etc/standby/config.json"]
+    # Root only to reach the Docker socket. Local demo only, never in a cloud.
+    user: "0:0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config.json:/etc/standby/config.json:ro
+      - ./manifest.json:/etc/standby/manifest.json:ro
+    tmpfs:
+      - /data
+    restart: unless-stopped

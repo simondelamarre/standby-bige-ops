@@ -1,0 +1,17 @@
+{
+	admin off
+	auto_https off
+}
+
+:80 {
+	# First healthy upstream wins: the app when it is up, the guardian otherwise.
+	# Health checks hit port 9090 (the tap on the app, the guardian itself),
+	# so they never count as app traffic.
+	reverse_proxy app:3000 guardian:8080 {
+		lb_policy first
+		health_uri /health
+		health_port 9090
+		health_interval 2s
+		health_timeout 1s
+	}
+}
