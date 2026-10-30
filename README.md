@@ -58,8 +58,16 @@ open http://localhost:8088
 ```
 
 The demo runs a load balancer (Caddy, standing in for the cloud load balancer),
-a sample app with its activity probe, a Redis "database" and the guardian.
-`idle_after` is 1 minute in the demo, so the stack falls asleep quickly:
+a static sample app with its activity probe, a Redis "database" and the guardian.
+It uses the start button and shows its settings (`page.show_setup`):
+
+1. The app page says the stack is up and counts down to the pause.
+2. Leave it alone: after `idle_after` (1 minute here) plus the load balancer
+   keepalive, the stack sleeps.
+3. Reload: the guardian shows its settings and a **Démarrer** button. Click it,
+   the page follows the wake-up and reloads on the app.
+
+Only the load balancer publishes a port (`127.0.0.1:8088`), as in the cloud.
 
 ```bash
 make local-logs      # watch the guardian decide
@@ -86,12 +94,14 @@ the next visit (or on a click, if you prefer the button).
 
 - `wake.on_visit: true` — a visit wakes the stack automatically.
 - `wake.on_visit: false, wake.button: true` — visitors click "Start".
+- `page.show_setup: true` — the waiting page and the status show these
+  settings and the time left before the pause.
 - `wake.schedule: true` — the stack wakes when a range opens (8:00, 14:00).
 - No `schedule` at all — on demand only, for a staging for instance.
 
 The idle clock starts once the last connection to the app closes. Load
 balancers keep their backend connections open for a while after the last
-request (about 60 s on an Outscale LBU, 2 min with the Caddy of the local demo),
+request (about 60 s on an Outscale LBU, 30 s in the local demo),
 so the stack falls asleep `idle_after` plus that delay after the last request.
 
 ## Why

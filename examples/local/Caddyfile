@@ -13,5 +13,10 @@
 		health_port 9090
 		health_interval 2s
 		health_timeout 1s
+		# Close idle connections to the app after 30 s, close to a cloud load
+		# balancer: an open connection counts as possible activity.
+		transport http {
+			keepalive 30s
+		}
 	}
 }

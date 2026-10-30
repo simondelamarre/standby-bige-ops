@@ -1,0 +1,20 @@
+{
+	admin off
+	auto_https off
+}
+
+# The demo app: a static page and a health endpoint. It echoes nothing from
+# the request. Demo only: it forwards /_standby/ to the guardian so the page
+# can show the guardian's settings while the app is up.
+:3000 {
+	handle /health {
+		respond "ok" 200
+	}
+	handle /_standby/* {
+		reverse_proxy guardian:8080
+	}
+	handle {
+		root * /srv
+		file_server
+	}
+}

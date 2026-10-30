@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Démo standby-bige-ops · app réveillée</title>
+<style>
+:root { --bg: #0b0d10; --card: #12151a; --border: #252b36; --text: #f3f5f8; --mist: #9aa3b2; --accent: #5ec4b4; }
+* { box-sizing: border-box; }
+html { color-scheme: dark; }
+body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); color: var(--text); font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 560px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+h1 { margin: 0 0 8px; font-size: 1.6rem; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-right: 8px; }
+p { margin: 0 0 12px; color: var(--mist); }
+#countdown { color: var(--text); font-weight: 500; }
+ol { margin: 16px 0 0; padding-left: 1.2rem; color: var(--mist); font-size: .95rem; }
+li { margin-bottom: 6px; }
+strong { color: var(--text); }
+</style>
+</head>
+<body>
+<main data-app="standby-demo-app">
+<h1><span class="dot" aria-hidden="true"></span>Ton app est up</h1>
+<p>Elle tourne avec ses machines : la base Redis puis l'app, réveillées dans cet ordre. La gardienne est hors rotation.</p>
+<p id="countdown" role="status" aria-live="polite">Lecture des réglages de la démo…</p>
+<ol>
+  <li>Ferme cet onglet ou ne touche plus à rien : sans trafic, la stack se met en pause.</li>
+  <li>Rouvre <strong>http://localhost:8088</strong> : la gardienne affiche ses réglages et le bouton <strong>Démarrer</strong>.</li>
+  <li>Clique : la page suit le réveil, puis se recharge toute seule sur l'app.</li>
+</ol>
+</main>
+<script>
+(function () {
+  "use strict";
+  var out = document.getElementById("countdown");
+  // Read once: every request to the app counts as traffic and would push the pause back.
+  fetch("/_standby/status", { cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (st) {
+      var idle = (st.setup && st.setup.idle_after_seconds) || 60;
+      var keepalive = 45; // the demo load balancer closes idle connections after 30 s, plus sampling
+      var end = Date.now() + (idle + keepalive) * 1000;
+      function tick() {
+        var left = Math.max(0, Math.round((end - Date.now()) / 1000));
+        if (left === 0) {
+          out.textContent = "La stack devrait être en pause. Recharge la page : la gardienne t'accueille. Si l'app répond encore, attends quelques secondes.";
+          return;
+        }
+        var m = Math.floor(left / 60), s = left % 60;
+        out.textContent = "Sans nouvelle requête, elle sera stoppée dans environ " + (m ? m + " min " : "") + s + " s (" +
+          Math.round(idle / 60) + " min sans trafic, plus ~30 s le temps que le load balancer ferme sa connexion).";
+        setTimeout(tick, 1000);
+      }
+      tick();
+    })
+    .catch(function () { out.textContent = "Réglages de la démo indisponibles."; });
+})();
+</script>
+</body>
+</html>

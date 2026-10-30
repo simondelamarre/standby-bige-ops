@@ -18,9 +18,11 @@ services:
     container_name: standby-demo-db
 
   app:
-    image: traefik/whoami:v1.12.0
+    image: caddy:2.11.7-alpine
     container_name: standby-demo-app
-    command: ["--port", "3000"]
+    volumes:
+      - ./app/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./app/index.html:/srv/index.html:ro
 
   tap:
     build: ../..
