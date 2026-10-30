@@ -1,5 +1,14 @@
 # standby-bige-ops
 
+<p align="center">
+  <a href="https://simondelamarre.github.io/standby-bige-ops/"><img src="https://img.shields.io/badge/D%C3%A9couvrir%20la%20page%20du%20projet-%E2%86%92-3d9e8f?style=for-the-badge" alt="Découvrir la page du projet standby-bige-ops" height="56" /></a>
+</p>
+<p align="center">
+  <a href="https://simondelamarre.github.io/standby-bige-ops/"><strong>simondelamarre.github.io/standby-bige-ops</strong></a> · schéma interactif, économies, sécurité — en français
+  <br />
+  par <a href="https://bige.dev">bige-ops</a>, l'application gratuite qui conçoit, chiffre, sécurise et déploie ton cloud
+</p>
+
 Put a cloud stack to sleep when nobody uses it, and wake it up cleanly on the
 next visit.
 
