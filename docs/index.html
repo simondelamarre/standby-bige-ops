@@ -43,10 +43,20 @@ code, pre { font-family: var(--font-mono); font-size: .88em; }
 pre { background: var(--ink-900); border: 1px solid var(--ink-700); border-radius: 10px; padding: 14px 16px; overflow-x: auto; color: #e6ebf1; }
 a { color: var(--accent-bright); }
 a:focus-visible, button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
-.card { background: var(--ink-900); border: 1px solid var(--ink-700); border-radius: 12px; padding: 18px 20px; }
-.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
-.grid h3 { margin: 0 0 6px; font-size: 1.05rem; color: var(--white); }
-.grid p { margin: 0; color: var(--mist); }
+.gains { margin: 28px 0 8px; padding: 0; list-style: none; }
+.gains li { display: grid; grid-template-columns: 36px 1fr; column-gap: 14px; margin: 0 0 22px; }
+.gains .icon { grid-row: span 2; margin-top: 2px; }
+.gains h3 { margin: 0 0 4px; font-size: 1.15rem; color: var(--white); }
+.gains p { margin: 0; color: var(--mist); }
+.gains strong { color: var(--accent-bright); font-weight: 600; }
+.icon { flex: none; width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(94,196,180,.35); background: rgba(94,196,180,.08); color: var(--accent-bright); }
+.icon svg { width: 20px; height: 20px; }
+.cta { margin: 18px 0 8px; }
+.cta code { display: block; background: var(--ink-900); border: 1px solid var(--ink-700); border-radius: 10px; padding: 14px 16px; color: #e6ebf1; overflow-x: auto; white-space: nowrap; }
+.promises { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; padding: 0; list-style: none; font-size: .92rem; color: var(--mist); }
+.promises li::before { content: "✓ "; color: var(--accent-bright); }
+.button { display: inline-block; margin-top: 14px; padding: 9px 18px; border-radius: 8px; background: var(--accent); color: var(--ink-950); font-family: var(--font-display); font-weight: 600; text-decoration: none; }
+.button:hover { background: var(--accent-bright); }
 .states { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 12px; }
 .states button { font-family: var(--font-display); font-size: .95rem; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--ink-600); background: transparent; color: var(--text); cursor: pointer; }
 .states button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--ink-950); font-weight: 600; }
@@ -72,10 +82,29 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--ink-70
 <main>
 <div class="brand-row"><p class="brand">standby<span class="ops">-bige-ops</span></p><span class="brand-badge">Open source · en développement</span></div>
 <h1>Ta stack dort quand personne ne s'en sert.</h1>
-<p class="lead">Elle se réveille à la première visite, dans le bon ordre. Tu ne paies plus le calcul de machines qui tournent à vide, et le datacenter dépense moins d'énergie pour rien.</p>
-<p>Une toute petite VM, la gardienne, se place à côté de ta stack, derrière le même load balancer. Quand l'app tourne, elle ne fait rien. Quand personne ne s'en sert, elle met les machines en pause. Au prochain visiteur, elle les rallume et affiche une page d'attente qui suit le démarrage.</p>
+<p class="lead">Et se réveille au premier visiteur, dans le bon ordre, en une à deux minutes. Tu arrêtes de payer des machines qui tournent pour rien.</p>
+<p>Une toute petite VM, la gardienne, veille sur ta stack. Quand l'app tourne, elle ne fait rien. Quand plus personne ne s'en sert, elle met les machines en pause. Au prochain visiteur, elle les rallume et affiche une page d'attente qui suit le démarrage.</p>
 
-<h2>Le principe en trois états</h2>
+<ul class="gains">
+  <li>
+    <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 6.5A7 7 0 1 0 17 17.5"/><path d="M4 10h9M4 14h9"/></svg></span>
+    <h3>Moins cher</h3>
+    <p>Tu ne paies plus le calcul des machines qui dorment. Allumée seulement aux heures de bureau, une stack de 3 VMs passe de 565 € à <strong>environ 286 € HT par mois</strong>, gardienne comprise.</p>
+  </li>
+  <li>
+    <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>
+    <h3>Moins d'énergie</h3>
+    <p>Une machine en pause ne fait plus travailler de processeur. Le serveur consomme <strong>moins d'électricité</strong> pour rien, la nuit, le week-end, entre deux démos.</p>
+  </li>
+  <li>
+    <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19c0-9 6-14 15-15-1 9-6 15-15 15z"/><path d="M5 19c3-4 6-7 10-9"/></svg></span>
+    <h3>Plus de nature</h3>
+    <p>Moins de chaleur à évacuer, c'est <strong>moins d'eau et d'énergie</strong> pour refroidir le datacenter. Et la capacité que tu libères sert à d'autres.</p>
+  </li>
+</ul>
+<p class="note">Estimation faite avec bige-ops sur une stack à la demande. Les disques, les IP et le load balancer restent facturés pendant la pause, et une VM réservée est due quoi qu'il arrive. Pas de chiffre de CO₂ ou de litres d'eau par VM : ça dépend du datacenter. On mesure ce qui se mesure, les heures où ta stack dort.</p>
+
+<h2>Comment ça marche</h2>
 <div class="states" role="group" aria-label="État de la stack">
   <button type="button" id="b-up" aria-pressed="true">Démarrée</button>
   <button type="button" id="b-pause" aria-pressed="false">En veille</button>
@@ -121,24 +150,24 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--ink-70
 "wake": { "on_visit": true, "button": false }</code></pre>
 <p class="note">Une visite la nuit réveille la stack une seule fois : les visiteurs suivants voient la progression, sans relancer le démarrage. <code>/robots.txt</code>, <code>/favicon.ico</code> et <code>/.well-known/</code> ne réveillent jamais rien, et des plafonds (réveils par jour, heures allumées par mois) bornent ce que les robots peuvent te coûter.</p>
 
-<h2>Pourquoi le faire</h2>
-<div class="grid">
-  <div class="card"><h3>Économie</h3><p>Une VM en pause ne paie plus son calcul. Exemple estimé : une stack de 3 VMs à 565 € HT par mois, dont 75 % de calcul, allumée en semaine de 9h à 18h, revient à environ 286 € par mois, gardienne comprise.</p></div>
-  <div class="card"><h3>Écologie</h3><p>Une VM en pause ne fait plus travailler de processeur. Le serveur consomme moins d'électricité et dégage moins de chaleur : il faut moins d'énergie et moins d'eau pour le refroidir, et la capacité libérée sert à d'autres.</p></div>
-  <div class="card"><h3>Sans mentir</h3><p>Les disques, les IP et le load balancer restent facturés pendant la pause. Une VM réservée est due quoi qu'il arrive. Nous ne publions aucun chiffre de CO₂ ou de litres d'eau par VM : il dépend du datacenter. Nous mesurons les heures où ta stack dort.</p></div>
-</div>
-
 <h2>Sûre par construction</h2>
 <ul class="arrows">
-  <li>La gardienne n'est jamais sur le chemin des requêtes quand l'app tourne : aucune perte de performance, aucun point de panne en plus.</li>
-  <li>Elle n'a pas d'IP publique. Elle ne parle qu'à l'API du cloud et aux machines de ta stack.</li>
-  <li>Sa clé ne sait que lire, démarrer et arrêter des machines, et elle refuse toute machine absente de son manifeste.</li>
-  <li>La page d'attente est servie avec une CSP stricte, sans JavaScript tiers, et ne dévoile aucun détail interne.</li>
-  <li>Un seul binaire Go, bibliothèque standard uniquement, sans télémétrie. Lis le <a href="https://github.com/simondelamarre/standby-bige-ops/blob/main/THREAT_MODEL.md">modèle de menace</a>.</li>
+  <li>Jamais sur le chemin des requêtes quand l'app tourne : aucune perte de performance.</li>
+  <li>Pas d'IP publique, une clé qui ne sait que lire, démarrer et arrêter tes machines, rien d'autre.</li>
+  <li>Un seul binaire Go, sans dépendance ni télémétrie, à relire en un après-midi : <a href="https://github.com/simondelamarre/standby-bige-ops/blob/main/THREAT_MODEL.md">modèle de menace</a>.</li>
 </ul>
+<p>Et pour le reste de ta stack, bige-ops <a href="https://bige.dev/#failles">cherche les failles de ton code et de tes dépendances</a>, sur ton poste.</p>
+
+<h2>Avec bige-ops, c'est un interrupteur</h2>
+<p><a href="https://bige.dev">bige-ops</a> est une application gratuite, installée sur ton poste, qui conçoit ton infrastructure cloud, la chiffre, vérifie ses failles et la déploie. La mise en veille y arrive comme un simple interrupteur sur ta stack : horaires, page d'attente et économie estimée avant de l'activer (en cours d'intégration).</p>
+<div class="cta">
+  <code>brew install --cask simondelamarre/bige-ops/bige-ops</code>
+  <ul class="promises"><li>Gratuit</li><li>Sans carte bancaire</li><li>Sans compte cloud pour commencer</li></ul>
+  <a class="button" href="https://bige.dev">Découvrir bige-ops</a>
+</div>
 
 <h2>Essaie-la en local</h2>
-<p>Il te faut seulement Docker. La démo lance un load balancer, une app, une base et la gardienne, avec une veille au bout d'une minute.</p>
+<p>Il te faut seulement Docker. La démo lance un load balancer, une app, une base et la gardienne. L'app t'indique dans combien de temps elle sera mise en pause ; recharge ensuite la page : la gardienne affiche ses réglages et un bouton <strong>Démarrer</strong>, puis suit le réveil jusqu'au retour de l'app.</p>
 <pre><code>git clone https://github.com/simondelamarre/standby-bige-ops
 cd standby-bige-ops
 make test
@@ -146,10 +175,9 @@ make local-up
 open http://localhost:8088</code></pre>
 
 <h2>Où en est le projet</h2>
-<p>Le cycle complet fonctionne en local avec Docker. Le pilote Outscale est en cours ; Scaleway et OVHcloud viendront ensuite. Ne l'utilise pas encore en production.</p>
-<p>Elle est conçue pour <a href="https://bige.dev">bige-ops</a>, qui génère sa configuration depuis ta simulation, mais elle n'en dépend pas : un manifeste et un fichier de configuration suffisent pour la forker.</p>
+<p>Le cycle complet tourne en local avec Docker. Le pilote Outscale est en cours ; Scaleway et OVHcloud suivront. Le code est ouvert : un manifeste et un fichier de configuration suffisent pour le forker, avec ou sans bige-ops.</p>
 
-<footer>standby-bige-ops · licence Apache-2.0 · <a href="https://github.com/simondelamarre/standby-bige-ops">code source</a></footer>
+<footer>standby-bige-ops · licence Apache-2.0 · <a href="https://github.com/simondelamarre/standby-bige-ops">code source</a> · par <a href="https://bige.dev">bige-ops</a></footer>
 </main>
 <script>
 (function () {
