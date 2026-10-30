@@ -114,6 +114,40 @@ balancers keep their backend connections open for a while after the last
 request (about 60 s on an Outscale LBU, 30 s in the local demo),
 so the stack falls asleep `idle_after` plus that delay after the last request.
 
+## Make the waiting page yours
+
+No fork, no HTML: a few variables in `page` make the page look like your app.
+
+```json
+"page": {
+  "app_name": "Acme Board",
+  "logo": "logo.svg",
+  "primary_color": "#3d9e8f",
+  "background_color": "#0b0d10",
+  "text_color": "#f3f5f8",
+  "lang": "fr",
+  "contact": "mailto:support@example.com",
+  "reason": "",
+  "show_reason": true,
+  "show_setup": true
+}
+```
+
+- `app_name` personalises the title and the message ("On rallume Acme Board").
+- `logo` (PNG or SVG, 64 KiB at most) is shown on the page and used as its icon.
+- `reason` explains why the app sleeps; leave it empty for the built-in text
+  about energy and resources, or set `show_reason` to false to hide it.
+- `title` and `message` replace the default texts entirely.
+
+Free HTML is not offered on purpose: the page is served on your app's own
+domain, and a template would open the door to scripts there.
+
+See it before deploying, with a simulated wake-up and no machine:
+
+```bash
+standby preview --config examples/preview/config.json
+```
+
 ## Why
 
 - **Money.** A sleeping machine no longer bills compute. Disks, public IPs and

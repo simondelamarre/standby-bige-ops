@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "driver": { "name": "docker" },
+  "tap": { "url": "http://app:9090/activity" },
+  "schedule": {
+    "timezone": "Europe/Paris",
+    "days": ["mon", "tue", "wed", "thu", "fri"],
+    "awake": ["08:00-12:00", "14:00-18:00"]
+  },
+  "page": {
+    "app_name": "Acme Board",
+    "lang": "fr",
+    "logo": "logo.svg",
+    "primary_color": "#3d9e8f",
+    "background_color": "#0b0d10",
+    "text_color": "#f3f5f8",
+    "contact": "mailto:support@example.com",
+    "show_setup": true
+  }
+}
