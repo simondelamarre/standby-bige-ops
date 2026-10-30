@@ -57,6 +57,9 @@ type Config struct {
 type Driver struct {
 	Name         string `json:"name"`
 	DockerSocket string `json:"docker_socket,omitempty"`
+	// Outscale: region and a JSON key pair readable by its owner only.
+	Region          string `json:"region,omitempty"`
+	CredentialsFile string `json:"credentials_file,omitempty"`
 }
 
 type Schedule struct {
@@ -183,8 +186,12 @@ func (c *Config) Validate() error {
 		if c.Driver.DockerSocket == "" {
 			add("driver.docker_socket is required")
 		}
+	case "outscale":
+		if c.Driver.Region == "" || c.Driver.CredentialsFile == "" {
+			add("driver.region and driver.credentials_file are required for outscale")
+		}
 	default:
-		add("driver.name %q is not supported yet (docker)", c.Driver.Name)
+		add("driver.name %q is not supported (docker, outscale)", c.Driver.Name)
 	}
 	if c.Schedule != nil {
 		if _, err := schedule.Parse(c.Schedule.Timezone, c.Schedule.Days, c.Schedule.Awake); err != nil {

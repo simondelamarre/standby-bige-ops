@@ -18,6 +18,7 @@ import (
 	"github.com/simondelamarre/standby-bige-ops/internal/controller"
 	"github.com/simondelamarre/standby-bige-ops/internal/driver"
 	"github.com/simondelamarre/standby-bige-ops/internal/driver/docker"
+	"github.com/simondelamarre/standby-bige-ops/internal/driver/outscale"
 	"github.com/simondelamarre/standby-bige-ops/internal/manifest"
 	"github.com/simondelamarre/standby-bige-ops/internal/probe"
 	"github.com/simondelamarre/standby-bige-ops/internal/schedule"
@@ -99,9 +100,24 @@ func resolve(dir, p string) string {
 	return filepath.Join(dir, p)
 }
 
+func newDriver(l *loaded) (driver.Driver, error) {
+	d := l.cfg.Driver
+	switch d.Name {
+	case "outscale":
+		creds, err := outscale.LoadCredentials(resolve(l.dir, d.CredentialsFile))
+		if err != nil {
+			return nil, err
+		}
+		return outscale.New(d.Region, creds)
+	default:
+		return docker.NewUnix(d.DockerSocket), nil
+	}
+}
+
 func validate(args []string) error {
 	fs := flag.NewFlagSet("validate", flag.ContinueOnError)
 	path := fs.String("config", "config.json", "configuration file")
+	live := fs.Bool("live", false, "also read the machine states from the provider (read-only)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -110,6 +126,23 @@ func validate(args []string) error {
 		return err
 	}
 	fmt.Printf("ok: stack %s, %d machines in %d waves\n", l.m.Stack, len(l.m.IDs()), len(l.m.Waves))
+	if !*live {
+		return nil
+	}
+	// Read-only check of the credentials and the machines: one state read.
+	inner, err := newDriver(l)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	states, err := driver.NewGuard(inner, l.m.IDs()).States(ctx, l.m.IDs())
+	if err != nil {
+		return err
+	}
+	for _, id := range l.m.IDs() {
+		fmt.Printf("  %s: %s\n", id, states[id])
+	}
 	return nil
 }
 
@@ -128,7 +161,11 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	drv := driver.NewGuard(docker.NewUnix(l.cfg.Driver.DockerSocket), l.m.IDs())
+	inner, err := newDriver(l)
+	if err != nil {
+		return err
+	}
+	drv := driver.NewGuard(inner, l.m.IDs())
 	seq := &sequencer.Sequencer{
 		Driver: drv, Probe: probe.Check,
 		Poll: 2 * time.Second, StateTimeout: 5 * time.Minute, ProbeTimeout: 5 * time.Minute,

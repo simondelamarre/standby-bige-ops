@@ -39,13 +39,26 @@
       "properties": {
         "name": {
           "enum": [
-            "docker"
+            "docker",
+            "outscale"
           ],
           "default": "docker"
         },
         "docker_socket": {
           "type": "string",
           "default": "/var/run/docker.sock"
+        },
+        "region": {
+          "type": "string",
+          "pattern": "^[a-z]+(-[a-z]+)*-[0-9]+$",
+          "examples": [
+            "eu-west-2"
+          ],
+          "description": "Outscale region."
+        },
+        "credentials_file": {
+          "type": "string",
+          "description": "Outscale: JSON {\"access_key\",\"secret_key\"}, mode 600, relative to this file. Never put keys in the configuration itself."
         }
       }
     },

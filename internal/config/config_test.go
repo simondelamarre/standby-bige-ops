@@ -36,7 +36,8 @@ func TestLoadRejects(t *testing.T) {
 		"script contact":  `{"version": 1, "tap": {"url": "http://a:1/x"}, "page": {"contact": "javascript:alert(1)"}}`,
 		"nothing wakes":   `{"version": 1, "tap": {"url": "http://a:1/x"}, "wake": {"on_visit": false}}`,
 		"same ports":      `{"version": 1, "tap": {"url": "http://a:1/x"}, "listen": ":80", "health_listen": ":80"}`,
-		"other driver":    `{"version": 1, "tap": {"url": "http://a:1/x"}, "driver": {"name": "outscale"}}`,
+		"outscale no key": `{"version": 1, "tap": {"url": "http://a:1/x"}, "driver": {"name": "outscale", "region": "eu-west-2"}}`,
+		"unknown driver":  `{"version": 1, "tap": {"url": "http://a:1/x"}, "driver": {"name": "gcp"}}`,
 		"trailing data":   `{"version": 1, "tap": {"url": "http://a:1/x"}} {}`,
 		"crossing window": `{"version": 1, "tap": {"url": "http://a:1/x"}, "schedule": {"timezone": "UTC", "days": ["mon"], "awake": ["22:00-06:00"]}}`,
 	}
