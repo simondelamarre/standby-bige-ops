@@ -1,8 +1,11 @@
 // Package controller decides when the stack sleeps and wakes.
 //
-// Rules: inside the schedule window the stack stays up; outside it, the stack
-// sleeps once idle_after has passed without traffic. A wake starts once, on the
-// first visit or when the window opens, and is refused once a cap is reached.
+// Rules: inside the schedule window the stack stays up: it is woken when the
+// window opens, and again if it is found stopped (at most every scheduleRetry).
+// Outside it, the stack sleeps once idle_after has passed without traffic, the
+// idle clock starting when the stack came up, by a wake or by hand. A wake starts
+// once per visit or schedule and is refused once a cap is reached; caps count
+// days and months in the schedule's time zone.
 package controller
 
 import (
@@ -18,6 +21,10 @@ import (
 	"github.com/simondelamarre/standby-bige-ops/internal/sequencer"
 	"github.com/simondelamarre/standby-bige-ops/internal/store"
 )
+
+// scheduleRetry spaces the wakes of a stack found stopped inside the window, so a
+// failing wake does not spend the daily cap at every tick.
+const scheduleRetry = 10 * time.Minute
 
 type Phase string
 
@@ -79,6 +86,8 @@ type Controller struct {
 	lastActivity time.Time
 	lastTick     time.Time
 	inWindow     bool
+	// Last wake started by the schedule.
+	scheduleWakeAt time.Time
 }
 
 // New returns a controller; ctx bounds the wake and sleep sequences it starts.
@@ -145,9 +154,17 @@ func (c *Controller) Status() Status {
 	return st
 }
 
+// local puts t in the schedule's time zone, where caps count days and months.
+func (c *Controller) local(t time.Time) time.Time {
+	if c.opt.Window != nil {
+		return t.In(c.opt.Window.Location())
+	}
+	return t
+}
+
 func (c *Controller) canWakeLocked(now time.Time) (bool, string) {
 	caps := c.opt.Config.Caps
-	if c.opt.Store.WakesOn(now) >= caps.WakesPerDay || c.opt.Store.AwakeHours(now) >= float64(caps.AwakeHoursPerMonth) {
+	if c.opt.Store.WakesOn(c.local(now)) >= caps.WakesPerDay || c.opt.Store.AwakeHours(c.local(now)) >= float64(caps.AwakeHoursPerMonth) {
 		return false, "cap_reached"
 	}
 	return true, ""
@@ -174,7 +191,7 @@ func (c *Controller) startWakeLocked(reason string) {
 	c.phase = Waking
 	c.wakeStart = now
 	c.progress = sequencer.Progress{Steps: len(c.opt.Manifest.Waves) + 1}
-	c.opt.Store.CountWake(now)
+	c.opt.Store.CountWake(c.local(now))
 	c.saveLocked()
 	c.opt.Log.Info("wake started", "reason", reason)
 	c.wg.Add(1)
@@ -254,7 +271,7 @@ func (c *Controller) Tick(ctx context.Context) {
 	}
 	observed := summarize(states, ids)
 	if observed != Asleep && !previous.IsZero() {
-		c.opt.Store.AddAwake(now, now.Sub(previous))
+		c.opt.Store.AddAwake(c.local(now), now.Sub(previous))
 	}
 	if activityErr == nil && activity.After(c.lastActivity) {
 		c.lastActivity = activity
@@ -274,13 +291,20 @@ func (c *Controller) Tick(ctx context.Context) {
 	}
 	if c.phase != observed {
 		c.opt.Log.Info("observed", "phase", observed)
+		if observed == Awake {
+			// Up without a wake of ours (started by hand, guardian restarted):
+			// the idle clock starts now, not at the last traffic seen.
+			c.readyAt = now
+		}
 	}
 	c.phase = observed
 
 	switch c.phase {
 	case Asleep, Partial:
-		if windowOpened && c.opt.Config.Wake.Schedule {
+		retry := windowOpened || c.scheduleWakeAt.IsZero() || now.Sub(c.scheduleWakeAt) >= scheduleRetry
+		if inWindow && retry && c.opt.Config.Wake.Schedule {
 			if ok, _ := c.canWakeLocked(now); ok {
+				c.scheduleWakeAt = now
 				c.startWakeLocked("schedule")
 			}
 		}
@@ -304,7 +328,7 @@ func (c *Controller) Tick(ctx context.Context) {
 		}
 		if now.Sub(since) >= c.opt.Config.IdleAfter.Duration {
 			c.startSleepLocked("idle")
-		} else if c.opt.Store.AwakeHours(now) >= float64(c.opt.Config.Caps.AwakeHoursPerMonth) {
+		} else if c.opt.Store.AwakeHours(c.local(now)) >= float64(c.opt.Config.Caps.AwakeHoursPerMonth) {
 			c.startSleepLocked("cap_reached")
 		}
 	}

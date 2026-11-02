@@ -87,8 +87,10 @@ func (s *Store) MedianResume() (float64, bool) {
 	return v[len(v)/2], true
 }
 
+// CountWake, WakesOn, AddAwake and AwakeHours count days and months in the
+// location of now: the caller passes the schedule's time zone.
 func (s *Store) CountWake(now time.Time) {
-	day := now.UTC().Format("2006-01-02")
+	day := now.Format("2006-01-02")
 	if s.WakeDay != day {
 		s.WakeDay, s.WakesToday = day, 0
 	}
@@ -96,14 +98,14 @@ func (s *Store) CountWake(now time.Time) {
 }
 
 func (s *Store) WakesOn(now time.Time) int {
-	if s.WakeDay != now.UTC().Format("2006-01-02") {
+	if s.WakeDay != now.Format("2006-01-02") {
 		return 0
 	}
 	return s.WakesToday
 }
 
 func (s *Store) AddAwake(now time.Time, d time.Duration) {
-	month := now.UTC().Format("2006-01")
+	month := now.Format("2006-01")
 	if s.Month != month {
 		s.Month, s.AwakeSeconds = month, 0
 	}
@@ -111,7 +113,7 @@ func (s *Store) AddAwake(now time.Time, d time.Duration) {
 }
 
 func (s *Store) AwakeHours(now time.Time) float64 {
-	if s.Month != now.UTC().Format("2006-01") {
+	if s.Month != now.Format("2006-01") {
 		return 0
 	}
 	return s.AwakeSeconds / 3600

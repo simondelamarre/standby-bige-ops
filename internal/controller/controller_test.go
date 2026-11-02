@@ -210,3 +210,61 @@ func TestStatusHidesSetupByDefault(t *testing.T) {
 		t.Fatalf("status exposes the setup: %+v", st)
 	}
 }
+
+func TestWakesAgainInsideTheWindowWhenFoundStopped(t *testing.T) {
+	window, err := schedule.Parse("UTC", []string{"sat"}, []string{"12:30-18:00"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := newRig(t, nil, window)
+	r.clock.Add(31 * time.Minute)
+	r.tick() // 12:31, the window opens
+	r.waitPhase(t, Awake)
+	// Someone stops the machines in the middle of the window.
+	r.fake.Stop(context.Background(), []string{"db", "app"})
+	r.clock.Add(time.Minute)
+	r.tick()
+	r.waitPhase(t, Asleep) // too soon after the last schedule wake
+	r.clock.Add(10 * time.Minute)
+	r.tick()
+	r.waitPhase(t, Awake)
+}
+
+func TestAStackStartedByHandStartsItsIdleClock(t *testing.T) {
+	r := newRig(t, nil, nil)
+	r.traffic(r.clock.Now()) // old traffic, long before the manual start
+	r.clock.Add(3 * time.Hour)
+	r.fake.Start(context.Background(), []string{"db", "app"})
+	r.tick()
+	if r.ctrl.Status().Phase != Awake {
+		t.Fatalf("phase = %s, want awake", r.ctrl.Status().Phase)
+	}
+	r.clock.Add(30 * time.Minute)
+	r.tick()
+	if r.ctrl.Status().Phase != Awake {
+		t.Fatal("a stack started by hand slept before idle_after")
+	}
+	r.clock.Add(31 * time.Minute)
+	r.tick()
+	r.waitPhase(t, Asleep)
+}
+
+func TestTheDailyCapCountsDaysInTheScheduleTimeZone(t *testing.T) {
+	window, err := schedule.Parse("Europe/Paris", []string{"mon"}, []string{"08:00-09:00"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := newRig(t, func(c *config.Config) { c.Caps.WakesPerDay = 1 }, window)
+	r.clock.Add(11*time.Hour + 30*time.Minute) // Saturday 23:30 UTC, Sunday 00:30 in Paris
+	if !r.ctrl.RequestWake("visit") {
+		t.Fatal("first wake of the Paris day refused")
+	}
+	r.waitPhase(t, Awake)
+	r.clock.Add(61 * time.Minute)
+	r.tick()
+	r.waitPhase(t, Asleep)
+	// 00:31 UTC Sunday: still Sunday in Paris, the cap holds.
+	if r.ctrl.RequestWake("visit") {
+		t.Fatal("woke twice on the same Paris day")
+	}
+}

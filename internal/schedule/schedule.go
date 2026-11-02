@@ -94,6 +94,9 @@ func parseClock(s string) (int, error) {
 	return h*60 + m, nil
 }
 
+// Location is the time zone of the window: days and caps are counted in it.
+func (w *Window) Location() *time.Location { return w.loc }
+
 // Contains reports whether t falls inside one of the awake ranges.
 func (w *Window) Contains(t time.Time) bool {
 	lt := t.In(w.loc)
