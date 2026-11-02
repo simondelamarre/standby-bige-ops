@@ -170,10 +170,27 @@
         "url": {
           "type": "string",
           "description": "Activity endpoint of the probe on the app VM, e.g. http://app:9090/activity."
+        },
+        "urls": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string"
+          },
+          "description": "Activity endpoints when several machines serve the app, one probe each: traffic on any keeps the stack awake."
         }
       },
-      "required": [
-        "url"
+      "anyOf": [
+        {
+          "required": [
+            "url"
+          ]
+        },
+        {
+          "required": [
+            "urls"
+          ]
+        }
       ],
       "description": "Required: without the activity probe the guardian cannot tell whether someone uses the app."
     },

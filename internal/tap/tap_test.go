@@ -93,3 +93,23 @@ func TestActivityBeforeAnyTraffic(t *testing.T) {
 		t.Fatalf("activity = %+v, %v", a, err)
 	}
 }
+
+func TestClientsKeepTheLatestTrafficAndFailOnAnyUnreachableTap(t *testing.T) {
+	serve := func(unix int64) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_ = json.NewEncoder(w).Encode(activity{LastActiveUnix: unix})
+		}))
+	}
+	idle, busy := serve(0), serve(1_700_000_000)
+	defer idle.Close()
+	defer busy.Close()
+	at, err := Clients([]string{idle.URL, busy.URL})(context.Background())
+	if err != nil || at.Unix() != 1_700_000_000 {
+		t.Fatalf("latest = %v, %v", at, err)
+	}
+	down := httptest.NewServer(http.NotFoundHandler())
+	down.Close()
+	if _, err := Clients([]string{busy.URL, down.URL})(context.Background()); err == nil || !strings.Contains(err.Error(), down.URL) {
+		t.Fatalf("an unreachable tap must be an error naming it, got %v", err)
+	}
+}

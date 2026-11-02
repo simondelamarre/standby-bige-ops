@@ -179,7 +179,7 @@ func run(args []string) error {
 	defer stop()
 	ctrl := controller.New(ctx, controller.Options{
 		Config: l.cfg, Manifest: l.m, Seq: seq, Window: l.window, Store: st,
-		Activity: tap.Client(l.cfg.Tap.URL), Log: log,
+		Activity: tap.Clients(l.cfg.Tap.All()), Log: log,
 	})
 	page, err := web.New(ctrl, l.cfg, l.dir)
 	if err != nil {

@@ -40,6 +40,9 @@ func TestLoadRejects(t *testing.T) {
 		"unknown driver":  `{"version": 1, "tap": {"url": "http://a:1/x"}, "driver": {"name": "gcp"}}`,
 		"trailing data":   `{"version": 1, "tap": {"url": "http://a:1/x"}} {}`,
 		"crossing window": `{"version": 1, "tap": {"url": "http://a:1/x"}, "schedule": {"timezone": "UTC", "days": ["mon"], "awake": ["22:00-06:00"]}}`,
+		"empty taps":      `{"version": 1, "tap": {"urls": []}}`,
+		"blank tap":       `{"version": 1, "tap": {"urls": ["http://a:1/x", ""]}}`,
+		"script tap":      `{"version": 1, "tap": {"urls": ["http://a:1/x", "file:///etc/passwd"]}}`,
 	}
 	for name, body := range cases {
 		if _, err := Load(write(t, body)); err == nil {
@@ -60,5 +63,19 @@ func TestValidateReportsEveryProblem(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not mention %s", err, want)
 		}
+	}
+}
+
+func TestSeveralTapsWhenSeveralMachinesServeTheApp(t *testing.T) {
+	cfg, err := Load(write(t, `{"version": 1, "tap": {"urls": ["http://10.0.0.5:9090/activity", "http://10.0.10.7:9090/activity"]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Tap.All(); len(got) != 2 || got[1] != "http://10.0.10.7:9090/activity" {
+		t.Fatalf("taps = %v", got)
+	}
+	both := Tap{URL: "http://a:1/x", URLs: []string{"http://b:1/x"}}
+	if got := both.All(); len(got) != 2 || got[0] != "http://a:1/x" {
+		t.Fatalf("taps = %v", got)
 	}
 }

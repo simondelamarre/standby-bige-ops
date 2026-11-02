@@ -79,8 +79,19 @@ type Caps struct {
 	AwakeHoursPerMonth int `json:"awake_hours_per_month"`
 }
 
+// Tap points at the activity probes of the app. An app served by several
+// machines has one probe on each: traffic on any of them keeps the stack awake.
 type Tap struct {
-	URL string `json:"url,omitempty"`
+	URL  string   `json:"url,omitempty"`
+	URLs []string `json:"urls,omitempty"`
+}
+
+// All returns every probe URL, url first.
+func (t Tap) All() []string {
+	if t.URL == "" {
+		return t.URLs
+	}
+	return append([]string{t.URL}, t.URLs...)
 }
 
 type Page struct {
@@ -216,10 +227,21 @@ func (c *Config) Validate() error {
 	if !c.Wake.OnVisit && !c.Wake.Button && !(c.Wake.Schedule && c.Schedule != nil) {
 		add("wake: nothing can wake the stack (enable on_visit, button or a schedule)")
 	}
-	if c.Tap.URL == "" {
+	if c.Tap.URL == "" && len(c.Tap.URLs) == 0 {
 		add("tap.url is required: without the activity probe the guardian cannot tell whether someone uses the app")
-	} else if u, err := url.Parse(c.Tap.URL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		add("tap.url must be an http(s) URL")
+	}
+	if len(c.Tap.URLs) > 32 {
+		add("tap.urls: at most 32 probes")
+	}
+	probes := c.Tap.URLs
+	if c.Tap.URL != "" {
+		probes = append([]string{c.Tap.URL}, probes...)
+	}
+	for _, raw := range probes {
+		if u, err := url.Parse(raw); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			add("tap.url and tap.urls must be http(s) URLs")
+			break
+		}
 	}
 	if c.Caps.WakesPerDay < 1 {
 		add("caps.wakes_per_day must be at least 1")

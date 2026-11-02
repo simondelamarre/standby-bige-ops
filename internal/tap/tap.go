@@ -182,6 +182,29 @@ func splitAddr(s string) (net.IP, int, error) {
 	return net.IP(b), int(port), nil
 }
 
+// Clients reads every probe of an app served by several machines and returns
+// the latest traffic among them. One unreachable probe is an error: the guardian
+// never puts a user it cannot see to sleep.
+func Clients(urls []string) func(context.Context) (time.Time, error) {
+	reads := make([]func(context.Context) (time.Time, error), len(urls))
+	for i, u := range urls {
+		reads[i] = Client(u)
+	}
+	return func(ctx context.Context) (time.Time, error) {
+		var latest time.Time
+		for i, read := range reads {
+			at, err := read(ctx)
+			if err != nil {
+				return time.Time{}, fmt.Errorf("%s: %w", urls[i], err)
+			}
+			if at.After(latest) {
+				latest = at
+			}
+		}
+		return latest, nil
+	}
+}
+
 // Client returns the guardian side: the last moment traffic reached the app.
 func Client(url string) func(context.Context) (time.Time, error) {
 	c := &http.Client{Timeout: 3 * time.Second}
