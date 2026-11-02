@@ -106,10 +106,16 @@ the next visit (or on a click, if you prefer the button).
 - `wake.on_visit: false, wake.button: true` — visitors click "Start".
 - `page.show_setup: true` — the waiting page and the status show these
   settings and the time left before the pause.
-- `wake.schedule: true` — the stack wakes when a range opens (8:00, 14:00).
+- `wake.schedule: true` — the stack wakes when a range opens (8:00, 14:00),
+  and again if it is found stopped inside a range (at most every 10 minutes,
+  so a failing wake does not use up the daily cap).
 - No `schedule` at all — on demand only, for a staging for instance.
 
-The idle clock starts once the last connection to the app closes. Load
+Caps count days and months in the schedule's time zone (UTC without one).
+
+The idle clock starts once the last connection to the app closes, or when the
+stack came up, whichever is later: a stack started by hand is not put back to
+sleep at once. Load
 balancers keep their backend connections open for a while after the last
 request (about 60 s on an Outscale LBU, 30 s in the local demo),
 so the stack falls asleep `idle_after` plus that delay after the last request.

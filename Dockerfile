@@ -1,4 +1,6 @@
-# Local tests and demos only. On a VM the guardian runs as a plain binary under systemd.
+# One image for both roles: bige-ops builds it on the VMs at a pinned commit and
+# runs the tap in the app container's network namespace and the guardian with
+# the host network. The local demo uses it too.
 FROM golang:1.27.3-alpine AS build
 WORKDIR /src
 COPY go.mod ./
