@@ -21,17 +21,22 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
 // DefaultFiles are the kernel socket tables read on Linux.
 var DefaultFiles = []string{"/proc/net/tcp", "/proc/net/tcp6"}
 
+// ErrCutOff ends a tap whose app port keeps refusing connections over loopback.
+var ErrCutOff = errors.New("the app port keeps refusing loopback connections: leaving so that Docker restarts the tap on the app's network")
+
 type Tap struct {
 	Port      int
 	Files     []string
 	AppHealth string // e.g. http://127.0.0.1:3000/health
 	Now       func() time.Time
+	Dial      func(context.Context) error // connects to the app port over loopback
 
 	client *http.Client
 	mu     sync.Mutex
@@ -40,12 +45,21 @@ type Tap struct {
 }
 
 func New(port int, appHealth string) *Tap {
+	address := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
 	return &Tap{
 		Port:      port,
 		Files:     DefaultFiles,
 		AppHealth: appHealth,
 		Now:       time.Now,
-		client:    &http.Client{Timeout: 3 * time.Second},
+		Dial: func(ctx context.Context) error {
+			d := net.Dialer{Timeout: 3 * time.Second}
+			conn, err := d.DialContext(ctx, "tcp", address)
+			if err == nil {
+				conn.Close()
+			}
+			return err
+		},
+		client: &http.Client{Timeout: 3 * time.Second},
 	}
 }
 
@@ -91,6 +105,37 @@ func (t *Tap) Run(ctx context.Context, interval time.Duration, onErr func(error)
 		case <-ctx.Done():
 			return
 		case <-tick.C:
+		}
+	}
+}
+
+// WatchLoopback returns ErrCutOff once every connection to the app port has been
+// refused for after, and nil when ctx ends. The tap lives in the network namespace
+// of the app container: when Docker restarts that container, the app gets a new
+// namespace and the tap stays alone on the old one, where nothing listens. Only a
+// restart of the tap brings it back. This is its own loop because a cut-off tap
+// receives no health check at all. Any other outcome restarts the count: an app
+// that is slow to start is never left behind for a timeout.
+func (t *Tap) WatchLoopback(ctx context.Context, interval, after time.Duration) error {
+	tick := time.NewTicker(interval)
+	defer tick.Stop()
+	var since time.Time
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-tick.C:
+		}
+		if !errors.Is(t.Dial(ctx), syscall.ECONNREFUSED) {
+			since = time.Time{}
+			continue
+		}
+		now := t.Now()
+		if since.IsZero() {
+			since = now
+		}
+		if now.Sub(since) >= after {
+			return ErrCutOff
 		}
 	}
 }

@@ -228,6 +228,7 @@ func runTap(args []string) error {
 	health := fs.String("app-health", "/health", "health path of the app, asked over loopback")
 	listen := fs.String("listen", ":9090", "address for /activity and /health")
 	interval := fs.Duration("interval", 5*time.Second, "sampling interval")
+	refused := fs.Duration("exit-when-refused", 3*time.Minute, "leave when the app port refuses loopback connections for this long, so Docker restarts the tap on the app's current network (0: never)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -246,6 +247,13 @@ func runTap(args []string) error {
 			errc <- err
 		}
 	}()
+	if *refused > 0 {
+		go func() {
+			if err := t.WatchLoopback(ctx, *interval, *refused); err != nil {
+				errc <- err
+			}
+		}()
+	}
 	log.Info("tap started", "version", version, "app_port", *port)
 	select {
 	case <-ctx.Done():
