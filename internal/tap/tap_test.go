@@ -3,11 +3,14 @@ package tap
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -111,5 +114,59 @@ func TestClientsKeepTheLatestTrafficAndFailOnAnyUnreachableTap(t *testing.T) {
 	down.Close()
 	if _, err := Clients([]string{busy.URL, down.URL})(context.Background()); err == nil || !strings.Contains(err.Error(), down.URL) {
 		t.Fatalf("an unreachable tap must be an error naming it, got %v", err)
+	}
+}
+
+// watched runs WatchLoopback on scripted dials, ten seconds apart; the last result repeats.
+func watched(ctx context.Context, results ...error) (error, *int) {
+	calls := 0
+	now := time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC)
+	tp := New(3000, "http://127.0.0.1:3000/health")
+	tp.Now = func() time.Time { now = now.Add(10 * time.Second); return now }
+	tp.Dial = func(context.Context) error {
+		calls++
+		return results[min(calls, len(results))-1]
+	}
+	return tp.WatchLoopback(ctx, time.Millisecond, 30*time.Second), &calls
+}
+
+func TestLeavesOnceTheAppPortKeepsRefusing(t *testing.T) {
+	err, calls := watched(context.Background(), syscall.ECONNREFUSED)
+	if !errors.Is(err, ErrCutOff) || *calls != 4 {
+		t.Fatalf("err = %v after %d dials", err, *calls)
+	}
+}
+
+func TestAnAnsweringPortRestartsTheCount(t *testing.T) {
+	refused := error(syscall.ECONNREFUSED)
+	err, calls := watched(context.Background(), refused, refused, refused, nil, refused)
+	if !errors.Is(err, ErrCutOff) || *calls != 8 {
+		t.Fatalf("err = %v after %d dials", err, *calls)
+	}
+}
+
+func TestOnlyARefusalCounts(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if err, _ := watched(ctx, context.DeadlineExceeded); err != nil {
+		t.Fatalf("left on a timeout: %v", err)
+	}
+}
+
+func TestWatchRecognisesARealRefusedPort(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	listening := New(port, "")
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Millisecond)
+	defer cancel()
+	if err := listening.WatchLoopback(ctx, time.Millisecond, 20*time.Millisecond); err != nil {
+		t.Fatalf("left while the app listens: %v", err)
+	}
+	ln.Close()
+	if err := New(port, "").WatchLoopback(context.Background(), time.Millisecond, 20*time.Millisecond); !errors.Is(err, ErrCutOff) {
+		t.Fatalf("err = %v", err)
 	}
 }
