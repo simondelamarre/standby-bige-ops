@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/simondelamarre/standby-bige-ops/internal/driver/ovh"
 	"github.com/simondelamarre/standby-bige-ops/internal/schedule"
 )
 
@@ -60,6 +61,10 @@ type Driver struct {
 	// Outscale: region and a JSON key pair readable by its owner only.
 	Region          string `json:"region,omitempty"`
 	CredentialsFile string `json:"credentials_file,omitempty"`
+	// OVHcloud: API endpoint, Public Cloud project and, in credentials_file,
+	// a JSON OAuth2 client readable by its owner only.
+	Endpoint    string `json:"endpoint,omitempty"`
+	ServiceName string `json:"service_name,omitempty"`
 }
 
 type Schedule struct {
@@ -121,7 +126,7 @@ func Default() Config {
 		HealthListen: ":9090",
 		Manifest:     "manifest.json",
 		State:        "state.json",
-		Driver:       Driver{Name: "docker", DockerSocket: "/var/run/docker.sock"},
+		Driver:       Driver{Name: "docker", DockerSocket: "/var/run/docker.sock", Endpoint: "ovh-eu"},
 		IdleAfter:    Duration{60 * time.Minute},
 		LBSettle:     Duration{15 * time.Second},
 		Tick:         Duration{10 * time.Second},
@@ -207,8 +212,18 @@ func (c *Config) Validate() error {
 		if c.Driver.Region == "" || c.Driver.CredentialsFile == "" {
 			add("driver.region and driver.credentials_file are required for outscale")
 		}
+	case "ovh":
+		if c.Driver.ServiceName == "" || c.Driver.CredentialsFile == "" {
+			add("driver.service_name and driver.credentials_file are required for ovh")
+		}
+		if c.Driver.ServiceName != "" && !ovh.ValidServiceName(c.Driver.ServiceName) {
+			add("driver.service_name must be 1 to 64 letters or digits")
+		}
+		if !ovh.ValidEndpoint(c.Driver.Endpoint) {
+			add("driver.endpoint %q is not supported (ovh-eu, ovh-ca, ovh-us)", c.Driver.Endpoint)
+		}
 	default:
-		add("driver.name %q is not supported (docker, outscale)", c.Driver.Name)
+		add("driver.name %q is not supported (docker, outscale, ovh)", c.Driver.Name)
 	}
 	if c.Schedule != nil {
 		if _, err := schedule.Parse(c.Schedule.Timezone, c.Schedule.Days, c.Schedule.Awake); err != nil {
