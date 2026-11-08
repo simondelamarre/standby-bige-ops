@@ -15,6 +15,8 @@
   var current = null; // the step being waited for
   var shown = 0;
   var etaEnd = 0;
+  var HANDOVER_MS = 15000; // the load balancer needs two health checks, 5 s apart
+  var awakeAt = 0;
 
   function duration(s) {
     if (s < 60) return s + " s";
@@ -74,16 +76,26 @@
     fetch("/_standby/status", { cache: "no-store", credentials: "omit" })
       .then(function (r) {
         var type = r.headers.get("Content-Type") || "";
+        // No backend is ready yet: reloading would replace this page by the bare error.
+        if (r.status >= 500) throw new Error("no backend");
         // Anything but our JSON means the load balancer already sends us to the app.
         if (!r.ok || type.indexOf("application/json") !== 0) throw new Error("app");
         return r.json();
       })
       .then(function (st) {
+        if (!st.phase) throw new Error("app");
         if (st.phase === "awake") {
+          current = null;
           bar.value = 100;
           etaEl.textContent = "";
           statusEl.textContent = d.tReady;
-          window.location.reload();
+          // Still our status: the load balancer has not moved visitors to the app yet.
+          awakeAt = awakeAt || Date.now();
+          if (Date.now() - awakeAt >= HANDOVER_MS) {
+            window.location.reload();
+            return;
+          }
+          setTimeout(poll, 1000);
           return;
         }
         // A sleep just finished: a fresh visit wakes the stack again.
@@ -102,7 +114,7 @@
           window.location.reload();
           return;
         }
-        setTimeout(poll, 5000);
+        setTimeout(poll, 2000);
       });
   }
 
