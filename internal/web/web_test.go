@@ -72,6 +72,19 @@ func TestVisitWakesAndServesAnHonestWaitingPage(t *testing.T) {
 	}
 }
 
+func TestWaitingPageNamesWhatIsStartingWithoutStepNumbers(t *testing.T) {
+	s, _ := newServer(t, nil)
+	body := get(s.Traffic(), "/", "text/html").Body.String()
+	for _, want := range []string{`data-t-machines="Démarrage des machines…"`, `data-t-soon="Encore quelques instants…"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %s in:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "data-t-step") {
+		t.Fatalf("step numbers are back:\n%s", body)
+	}
+}
+
 func TestTechnicalURLsNeverWake(t *testing.T) {
 	s, ctrl := newServer(t, nil)
 	for _, path := range []string{"/robots.txt", "/favicon.ico", "/.well-known/security.txt", "/_standby/status", "/_standby/app.js", "/_standby/unknown"} {
