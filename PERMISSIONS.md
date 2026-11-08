@@ -38,6 +38,25 @@ machines. If not, the guardian still refuses any machine absent from its
 manifest, and the residual risk is documented in
 [`THREAT_MODEL.md`](THREAT_MODEL.md).
 
+## OVHcloud driver
+
+A dedicated OAuth2 client (service account) per stack. Its id and secret sit in
+a JSON file (`{"client_id": "...", "client_secret": "..."}`) that only its owner
+can read: the guardian refuses a file with group or world permissions, and they
+never appear in the configuration, the logs or the status.
+
+The token is requested with `scope=all`: the IAM policy attached to the service
+account is what restricts it, and it should allow only these calls.
+
+| Call | Why |
+|---|---|
+| `GET /cloud/project/{serviceName}/instance` | Read the state of the stack machines |
+| `POST /cloud/project/{serviceName}/instance/{id}/shelve` | Put the stack to sleep: a stopped instance keeps being billed, a shelved one does not |
+| `POST /cloud/project/{serviceName}/instance/{id}/unshelve` | Wake a shelved machine |
+| `POST /cloud/project/{serviceName}/instance/{id}/start` | Wake a machine found stopped |
+
+Never called: `DELETE`, or anything else on the project.
+
 ## Network
 
 | Direction | Peer | Port |
