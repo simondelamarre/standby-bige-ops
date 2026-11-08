@@ -34,6 +34,11 @@ func TestPreviewSimulatesAWakeAndStartsOver(t *testing.T) {
 		t.Fatal("the waiting page must show while waking")
 	}
 	now = now.Add(6 * time.Second)
+	status := httptest.NewRecorder()
+	h.ServeHTTP(status, httptest.NewRequest(http.MethodGet, "/_standby/status", nil))
+	if status.Code != http.StatusNotFound {
+		t.Fatalf("status once awake = %d: visitors have moved to the app", status.Code)
+	}
 	if !strings.Contains(get(), "Ici, ton app répondrait") {
 		t.Fatal("the app placeholder must show once awake")
 	}
