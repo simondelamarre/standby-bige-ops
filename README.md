@@ -47,14 +47,31 @@ fork only needs a manifest and a configuration file.
 ## Status
 
 Early development. The Docker driver runs the whole cycle locally and the
-Outscale driver is written; its first run on a real account is next. Do not use
-it in production yet. Example configuration: [`examples/outscale`](examples/outscale).
+Outscale and OVHcloud drivers are written; their first run on a real account is
+next. Do not use it in production yet. Example configuration:
+[`examples/outscale`](examples/outscale).
 
 | Driver | Status |
 |---|---|
 | `docker` (local tests) | Working |
 | `outscale` | Implemented (ReadVms, StartVms, StopVms), signing checked against bige-ops; first run on a real account pending |
-| `ovh`, `scaleway` | Later |
+| `ovh` (Public Cloud) | Implemented (list, shelve, unshelve, start), tested against a fake API; first run on a real account pending |
+| `scaleway` | Later |
+
+On OVHcloud the guardian shelves instances instead of stopping them, because a
+stopped instance keeps being billed and a shelved one does not:
+
+```json
+"driver": {
+  "name": "ovh",
+  "endpoint": "ovh-eu",
+  "service_name": "0123456789abcdef0123456789abcdef",
+  "credentials_file": "/etc/standby/ovh.json"
+}
+```
+
+`endpoint` is `ovh-eu` (default), `ovh-ca` or `ovh-us`, and `service_name` is the
+Public Cloud project id. The manifest uses `"provider": "ovh"`.
 
 ## Try it locally
 
