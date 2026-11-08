@@ -74,6 +74,11 @@ const appPage = `<!doctype html><html lang="fr"><meta charset="utf-8"><meta name
 // simulated wake-up ends, and starts over.
 func Handler(c *Controller, page http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/_standby/status" && c.Status().Phase == controller.Awake {
+			// Visitors have moved to the app, which knows nothing of this path.
+			http.NotFound(w, r)
+			return
+		}
 		if !strings.HasPrefix(r.URL.Path, "/_standby/") && c.Status().Phase == controller.Awake {
 			c.reset()
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
