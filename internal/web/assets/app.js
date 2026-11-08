@@ -9,9 +9,17 @@
   var etaEl = document.getElementById("eta");
   var btn = document.getElementById("wake-btn");
   var loadedAt = Date.now();
+  var DEFAULT_STEP_S = 40;
+  var MIN_STEP_S = 20;
+  var SOON_S = 5; // the status never estimates less: below it, stop counting
+  var current = null; // the step being waited for
+  var shown = 0;
+  var etaEnd = 0;
 
   function duration(s) {
-    return s < 60 ? s + " s" : Math.round(s / 60) + " min";
+    if (s < 60) return s + " s";
+    var rest = s % 60;
+    return Math.floor(s / 60) + " min" + (rest ? " " + rest + " s" : "");
   }
 
   function label(st) {
@@ -21,10 +29,45 @@
     if (!st.can_wake && st.phase !== "waking") return d.tCap;
     if (st.phase === "waking" && st.steps > 0) {
       if (Date.now() - loadedAt > 10 * 60 * 1000) return d.tSlow;
-      var n = Math.min(st.step + 1, st.steps);
-      return d.tStep.replace("{n}", n).replace("{total}", st.steps);
+      return st.step >= st.steps - 1 ? d.tApp : d.tMachines;
     }
     return d.tStarting;
+  }
+
+  // A new step gets its share of the time still expected.
+  function follow(st) {
+    var now = Date.now();
+    if (!current || current.step !== st.step || current.steps !== st.steps) {
+      var share = st.eta_seconds / Math.max(st.steps - st.step, 1);
+      current = { step: st.step, steps: st.steps, since: now, seconds: st.eta_seconds ? Math.max(share, MIN_STEP_S) : DEFAULT_STEP_S };
+    }
+    if (st.eta_seconds) {
+      var end = now + st.eta_seconds * 1000;
+      etaEnd = etaEnd ? Math.min(etaEnd, end) : end;
+    }
+  }
+
+  function stopFollowing() {
+    current = null;
+    shown = 0;
+    etaEnd = 0;
+    bar.value = 0;
+    etaEl.textContent = "";
+  }
+
+  // The bar fills the finished steps and creeps inside the current one: it keeps
+  // moving through a long step and never announces a step that has not ended.
+  function paint() {
+    if (!current) return;
+    var now = Date.now();
+    var used = (now - current.since) / 1000 / current.seconds;
+    var inside = used <= 1 ? 0.85 * used : 0.85 + 0.13 * (1 - 1 / used);
+    var target = (100 * Math.min(current.step + inside, current.steps)) / current.steps;
+    shown += Math.max(target - shown, 0) * 0.2;
+    bar.value = shown;
+    if (d.showEta !== "true" || !etaEnd) return;
+    var left = Math.ceil((etaEnd - now) / 1000);
+    etaEl.textContent = left > SOON_S ? d.tEta.replace("{s}", duration(left)) : d.tSoon;
   }
 
   function poll() {
@@ -37,6 +80,8 @@
       })
       .then(function (st) {
         if (st.phase === "awake") {
+          bar.value = 100;
+          etaEl.textContent = "";
           statusEl.textContent = d.tReady;
           window.location.reload();
           return;
@@ -47,9 +92,9 @@
           return;
         }
         if (btn) btn.disabled = !st.can_wake || (st.phase !== "asleep" && st.phase !== "failed");
-        bar.value = st.steps > 0 ? Math.round((100 * st.step) / st.steps) : 0;
+        if (st.phase === "waking" && st.steps > 0) follow(st);
+        else stopFollowing();
         statusEl.textContent = label(st);
-        etaEl.textContent = d.showEta === "true" && st.eta_seconds ? d.tEta.replace("{s}", duration(st.eta_seconds)) : "";
         setTimeout(poll, 3000);
       })
       .catch(function (err) {
@@ -61,5 +106,6 @@
       });
   }
 
+  setInterval(paint, 200);
   poll();
 })();

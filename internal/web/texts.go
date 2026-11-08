@@ -2,10 +2,11 @@ package web
 
 // texts are the page strings; the script reads the dynamic ones from data attributes.
 type texts struct {
-	DefaultTitle, DefaultMessage                        string
-	NamedTitle, NamedMessage, DefaultReason             string
-	Starting, Step, ETA, Ready, Slow, Cap, Error, Sleep string
-	Asleep, Button, Contact, Progress                   string
+	DefaultTitle, DefaultMessage                    string
+	NamedTitle, NamedMessage, DefaultReason         string
+	Starting, Machines, App, ETA, Soon, Ready, Slow string
+	Cap, Error, Sleep, Asleep, Button, Contact      string
+	Progress                                        string
 	// Setup lines, shown with page.show_setup.
 	SetupTitle, IdleRule, WakeVisit, WakeButton, Ranges, NoRanges string
 	days                                                          map[string]string
@@ -28,8 +29,10 @@ func textsFor(lang string) texts {
 			NamedMessage:   "%s went to sleep after a quiet spell. It is starting again, which usually takes a few minutes.",
 			DefaultReason:  "To avoid wasting energy, this service sleeps when nobody uses it: less electricity, less heat to cool down, fewer resources used for nothing. It starts again as soon as someone needs it.",
 			Starting:       "Starting up…",
-			Step:           "Step {n} of {total}",
+			Machines:       "Starting the machines…",
+			App:            "Starting the application…",
 			ETA:            "About {s} left",
+			Soon:           "Almost there…",
 			Ready:          "Ready, reloading…",
 			Slow:           "This is taking longer than usual; the page reloads by itself.",
 			Cap:            "Automatic wake-up is paused for now.",
@@ -55,8 +58,10 @@ func textsFor(lang string) texts {
 		NamedMessage:   "%s s'était mis en veille faute de visites. Il redémarre, cela prend en général quelques minutes.",
 		DefaultReason:  "Pour ne pas dépenser d'énergie pour rien, ce service se met en veille quand personne ne l'utilise : moins d'électricité, moins de chaleur à refroidir, moins de ressources gaspillées. Il se rallume dès qu'on en a besoin.",
 		Starting:       "Démarrage en cours…",
-		Step:           "Étape {n} sur {total}",
+		Machines:       "Démarrage des machines…",
+		App:            "Lancement de l'application…",
 		ETA:            "Encore environ {s}",
+		Soon:           "Encore quelques instants…",
 		Ready:          "C'est prêt, rechargement…",
 		Slow:           "C'est plus long que prévu ; la page se recharge toute seule.",
 		Cap:            "Le réveil automatique est en pause pour le moment.",
