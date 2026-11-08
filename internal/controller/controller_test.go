@@ -139,6 +139,30 @@ func TestStaysAwakeWhenTheActivityProbeIsUnreachable(t *testing.T) {
 	}
 }
 
+func TestTheIdleClockRestartsWhenTheActivityProbeComesBack(t *testing.T) {
+	r := newRig(t, nil, nil)
+	r.ctrl.RequestWake("visit")
+	r.waitPhase(t, Awake)
+	setProbe := func(err error) { r.mu.Lock(); r.actErr = err; r.mu.Unlock() }
+	setProbe(io.ErrUnexpectedEOF)
+	r.clock.Add(3 * time.Hour)
+	r.tick()
+	setProbe(nil)
+	r.tick()
+	if got := r.ctrl.Status().Phase; got != Awake {
+		t.Fatalf("phase = %v right after the outage: it had no way to know the app was idle", got)
+	}
+	idle := config.Default().IdleAfter.Duration
+	r.clock.Add(idle - time.Second)
+	r.tick()
+	if got := r.ctrl.Status().Phase; got != Awake {
+		t.Fatalf("phase = %v before a full idle period", got)
+	}
+	r.clock.Add(time.Second)
+	r.tick()
+	r.waitPhase(t, Asleep)
+}
+
 func TestStaysAwakeInsideTheWindowAndWakesWhenItOpens(t *testing.T) {
 	window, err := schedule.Parse("UTC", []string{"sat"}, []string{"12:30-18:00"})
 	if err != nil {
