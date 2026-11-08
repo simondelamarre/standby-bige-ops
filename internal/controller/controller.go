@@ -85,6 +85,7 @@ type Controller struct {
 	readyAt      time.Time
 	lastActivity time.Time
 	lastTick     time.Time
+	activityLost bool // the probe failed while the stack was up
 	inWindow     bool
 	// Last wake started by the schedule.
 	scheduleWakeAt time.Time
@@ -309,6 +310,14 @@ func (c *Controller) Tick(ctx context.Context) {
 			}
 		}
 	case Awake:
+		if c.opt.Activity != nil && activityErr != nil {
+			c.activityLost = true
+		} else if c.activityLost {
+			// Nothing was seen during the outage: someone may have used the app.
+			c.activityLost = false
+			c.lastActivity = now
+			c.opt.Log.Info("activity probe readable again, idle clock restarted")
+		}
 		if inWindow {
 			return
 		}
