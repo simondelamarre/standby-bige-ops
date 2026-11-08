@@ -9,7 +9,7 @@
   "properties": {
     "version": { "const": 1 },
     "stack": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "provider": { "enum": ["docker", "outscale"] },
+    "provider": { "enum": ["docker", "outscale", "ovh"] },
     "waves": {
       "description": "Each wave starts only once the previous one is running and its probes pass.",
       "type": "array",

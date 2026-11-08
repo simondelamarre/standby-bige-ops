@@ -40,7 +40,8 @@
         "name": {
           "enum": [
             "docker",
-            "outscale"
+            "outscale",
+            "ovh"
           ],
           "default": "docker"
         },
@@ -58,7 +59,24 @@
         },
         "credentials_file": {
           "type": "string",
-          "description": "Outscale: JSON {\"access_key\",\"secret_key\"}, mode 600, relative to this file. Never put keys in the configuration itself."
+          "description": "Outscale: JSON {\"access_key\",\"secret_key\"}. OVHcloud: JSON {\"client_id\",\"client_secret\"}. Mode 600, relative to this file. Never put keys in the configuration itself."
+        },
+        "endpoint": {
+          "enum": [
+            "ovh-eu",
+            "ovh-ca",
+            "ovh-us"
+          ],
+          "default": "ovh-eu",
+          "description": "OVHcloud API endpoint."
+        },
+        "service_name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9]{1,64}$",
+          "examples": [
+            "0123456789abcdef0123456789abcdef"
+          ],
+          "description": "OVHcloud Public Cloud project id."
         }
       }
     },
