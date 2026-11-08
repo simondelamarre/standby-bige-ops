@@ -23,9 +23,9 @@ func textsFor(lang string) texts {
 	if lang == "en" {
 		return texts{
 			DefaultTitle:   "Waking the service up",
-			DefaultMessage: "This service went to sleep after a quiet spell. It is starting again, which usually takes one to two minutes.",
+			DefaultMessage: "This service went to sleep after a quiet spell. It is starting again, which usually takes a few minutes.",
 			NamedTitle:     "Waking %s up",
-			NamedMessage:   "%s went to sleep after a quiet spell. It is starting again, which usually takes one to two minutes.",
+			NamedMessage:   "%s went to sleep after a quiet spell. It is starting again, which usually takes a few minutes.",
 			DefaultReason:  "To avoid wasting energy, this service sleeps when nobody uses it: less electricity, less heat to cool down, fewer resources used for nothing. It starts again as soon as someone needs it.",
 			Starting:       "Starting up…",
 			Step:           "Step {n} of {total}",
@@ -50,9 +50,9 @@ func textsFor(lang string) texts {
 	}
 	return texts{
 		DefaultTitle:   "On rallume le service",
-		DefaultMessage: "Ce service s'était mis en veille faute de visites. Il redémarre, cela prend en général une à deux minutes.",
+		DefaultMessage: "Ce service s'était mis en veille faute de visites. Il redémarre, cela prend en général quelques minutes.",
 		NamedTitle:     "On rallume %s",
-		NamedMessage:   "%s s'était mis en veille faute de visites. Il redémarre, cela prend en général une à deux minutes.",
+		NamedMessage:   "%s s'était mis en veille faute de visites. Il redémarre, cela prend en général quelques minutes.",
 		DefaultReason:  "Pour ne pas dépenser d'énergie pour rien, ce service se met en veille quand personne ne l'utilise : moins d'électricité, moins de chaleur à refroidir, moins de ressources gaspillées. Il se rallume dès qu'on en a besoin.",
 		Starting:       "Démarrage en cours…",
 		Step:           "Étape {n} sur {total}",
