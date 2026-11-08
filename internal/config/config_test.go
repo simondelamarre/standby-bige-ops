@@ -66,6 +66,44 @@ func TestValidateReportsEveryProblem(t *testing.T) {
 	}
 }
 
+func TestOVHDriver(t *testing.T) {
+	const project = `"service_name": "0123456789abcdef0123456789abcdef"`
+	const key = `"credentials_file": "/etc/standby/ovh.json"`
+	cases := []struct {
+		name     string
+		driver   string
+		endpoint string
+		wantErr  string
+	}{
+		{name: "default endpoint", driver: `{"name": "ovh", ` + project + `, ` + key + `}`, endpoint: "ovh-eu"},
+		{name: "explicit endpoint", driver: `{"name": "ovh", "endpoint": "ovh-ca", ` + project + `, ` + key + `}`, endpoint: "ovh-ca"},
+		{name: "missing service name", driver: `{"name": "ovh", ` + key + `}`, wantErr: "driver.service_name"},
+		{name: "missing credentials", driver: `{"name": "ovh", ` + project + `}`, wantErr: "driver.credentials_file"},
+		{name: "bad endpoint", driver: `{"name": "ovh", "endpoint": "ovh-fr", ` + project + `, ` + key + `}`, wantErr: "driver.endpoint"},
+		{name: "empty endpoint", driver: `{"name": "ovh", "endpoint": "", ` + project + `, ` + key + `}`, wantErr: "driver.endpoint"},
+		{name: "path in service name", driver: `{"name": "ovh", "service_name": "abc/../other", ` + key + `}`, wantErr: "driver.service_name"},
+		{name: "unknown field", driver: `{"name": "ovh", "application_key": "x", ` + project + `, ` + key + `}`, wantErr: "application_key"},
+		{name: "unknown driver lists ovh", driver: `{"name": "gcp"}`, wantErr: "docker, outscale, ovh"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cfg, err := Load(write(t, `{"version": 1, "tap": {"url": "http://a:1/x"}, "driver": `+c.driver+`}`))
+			if c.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), c.wantErr) {
+					t.Fatalf("err = %v, want it to mention %s", err, c.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.Driver.Endpoint != c.endpoint {
+				t.Fatalf("endpoint = %q, want %q", cfg.Driver.Endpoint, c.endpoint)
+			}
+		})
+	}
+}
+
 func TestSeveralTapsWhenSeveralMachinesServeTheApp(t *testing.T) {
 	cfg, err := Load(write(t, `{"version": 1, "tap": {"urls": ["http://10.0.0.5:9090/activity", "http://10.0.10.7:9090/activity"]}}`))
 	if err != nil {
