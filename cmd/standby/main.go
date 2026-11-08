@@ -19,6 +19,7 @@ import (
 	"github.com/simondelamarre/standby-bige-ops/internal/driver"
 	"github.com/simondelamarre/standby-bige-ops/internal/driver/docker"
 	"github.com/simondelamarre/standby-bige-ops/internal/driver/outscale"
+	"github.com/simondelamarre/standby-bige-ops/internal/driver/ovh"
 	"github.com/simondelamarre/standby-bige-ops/internal/manifest"
 	"github.com/simondelamarre/standby-bige-ops/internal/preview"
 	"github.com/simondelamarre/standby-bige-ops/internal/probe"
@@ -113,6 +114,12 @@ func newDriver(l *loaded) (driver.Driver, error) {
 			return nil, err
 		}
 		return outscale.New(d.Region, creds)
+	case "ovh":
+		creds, err := ovh.LoadCredentials(resolve(l.dir, d.CredentialsFile))
+		if err != nil {
+			return nil, err
+		}
+		return ovh.New(d.Endpoint, d.ServiceName, creds)
 	default:
 		return docker.NewUnix(d.DockerSocket), nil
 	}
