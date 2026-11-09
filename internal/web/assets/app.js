@@ -16,7 +16,9 @@
   var shown = 0;
   var etaEnd = 0;
   var HANDOVER_MS = 15000; // the load balancer needs two health checks, 5 s apart
+  var APP_ANSWERS = 5; // in a row, one per second: the guardian has left the rotation
   var awakeAt = 0;
+  var appAnswers = 0;
 
   function duration(s) {
     if (s < 60) return s + " s";
@@ -92,6 +94,20 @@
       .catch(function () {}); // the next poll asks again
   }
 
+  // The load balancer runs the app and the guardian side by side for a few
+  // seconds. A reload in that window would fetch part of the app's files from
+  // the guardian and end on the app's error page.
+  function appAnswered() {
+    awakeAt = awakeAt || Date.now();
+    appAnswers += 1;
+    if (appAnswers >= APP_ANSWERS && Date.now() - awakeAt >= HANDOVER_MS) {
+      window.location.reload();
+      return;
+    }
+    statusEl.textContent = d.tReady;
+    setTimeout(poll, 1000);
+  }
+
   function poll() {
     fetch("/_standby/status", { cache: "no-store", credentials: "omit" })
       .then(function (r) {
@@ -104,14 +120,16 @@
       })
       .then(function (st) {
         if (!st.phase) throw new Error("app");
+        appAnswers = 0;
         if (st.phase === "awake") {
           current = null;
           bar.value = 100;
           etaEl.textContent = "";
           statusEl.textContent = d.tReady;
           // Still our status: the load balancer has not moved visitors to the app yet.
+          // Reload in the end anyway, this connection may be the only one left on us.
           awakeAt = awakeAt || Date.now();
-          if (Date.now() - awakeAt >= HANDOVER_MS) {
+          if (Date.now() - awakeAt >= 2 * HANDOVER_MS) {
             window.location.reload();
             return;
           }
@@ -133,7 +151,7 @@
       })
       .catch(function (err) {
         if (err && err.message === "app") {
-          window.location.reload();
+          appAnswered();
           return;
         }
         setTimeout(poll, 2000);
