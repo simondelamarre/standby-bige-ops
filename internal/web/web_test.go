@@ -53,14 +53,22 @@ func get(h http.Handler, path, accept string) *httptest.ResponseRecorder {
 	return rec
 }
 
-func TestVisitWakesAndServesAnHonestWaitingPage(t *testing.T) {
+func postToken(h http.Handler, path, token string) int {
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(url.Values{"token": {token}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec.Code
+}
+
+func TestVisitServesAnHonestWaitingPageWithoutWaking(t *testing.T) {
 	s, ctrl := newServer(t, nil)
 	rec := get(s.Traffic(), "/dashboard?x=1", "text/html,application/xhtml+xml")
 	if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") == "" {
 		t.Fatalf("code %d, Retry-After %q", rec.Code, rec.Header().Get("Retry-After"))
 	}
-	if len(ctrl.wakes) != 1 || ctrl.wakes[0] != "visit" {
-		t.Fatalf("wakes = %v", ctrl.wakes)
+	if len(ctrl.wakes) != 0 {
+		t.Fatalf("a request alone woke the stack: %v", ctrl.wakes)
 	}
 	csp := rec.Header().Get("Content-Security-Policy")
 	if !strings.Contains(csp, "default-src 'none'") || !strings.Contains(csp, "script-src 'self'") {
@@ -107,6 +115,60 @@ func TestVisitWithoutOnVisitDoesNotWake(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `action="/_standby/wake"`) {
 		t.Fatal("the optional start button is missing")
 	}
+	if !strings.Contains(rec.Body.String(), `data-token=""`) {
+		t.Fatal("a page that must not wake carries a wake token")
+	}
+	if code := postToken(s.Traffic(), "/_standby/visit", s.token()); code != http.StatusNotFound || len(ctrl.wakes) != 0 {
+		t.Fatalf("visit wake with on_visit disabled: %d, wakes %v", code, ctrl.wakes)
+	}
+}
+
+func TestRequestsThatDoNotRunThePageNeverWake(t *testing.T) {
+	s, ctrl := newServer(t, nil)
+	for _, c := range []struct{ method, path, accept string }{
+		{http.MethodGet, "/", "*/*"},
+		{http.MethodGet, "/signin", "text/html"},
+		{http.MethodGet, "/wp-login.php", "text/html,application/xhtml+xml"},
+		{http.MethodGet, "/.env", ""},
+		{http.MethodGet, "/socket.io/?EIO=4&transport=polling", "*/*"},
+		{http.MethodPost, "/api/webhook", "application/json"},
+		{http.MethodPost, "/", "text/html"},
+	} {
+		req := httptest.NewRequest(c.method, c.path, nil)
+		req.Header.Set("Accept", c.accept)
+		s.Traffic().ServeHTTP(httptest.NewRecorder(), req)
+	}
+	if len(ctrl.wakes) != 0 {
+		t.Fatalf("woken without the page running: %v", ctrl.wakes)
+	}
+}
+
+func TestThePageAsksForTheWakeWithItsToken(t *testing.T) {
+	s, ctrl := newServer(t, nil)
+	now := time.Now()
+	s.Now = func() time.Time { return now }
+	body := get(s.Traffic(), "/", "text/html").Body.String()
+	_, rest, found := strings.Cut(body, `data-token="`)
+	token, _, closed := strings.Cut(rest, `"`)
+	if !found || !closed || token == "" {
+		t.Fatalf("no wake token in the page:\n%s", body)
+	}
+
+	for _, bad := range []string{"", token + "x"} {
+		if code := postToken(s.Traffic(), "/_standby/visit", bad); code != http.StatusForbidden || len(ctrl.wakes) != 0 {
+			t.Fatalf("token %q: %d, wakes %v", bad, code, ctrl.wakes)
+		}
+	}
+	if code := postToken(s.Traffic(), "/_standby/visit", token); code != http.StatusNoContent {
+		t.Fatalf("valid token: %d", code)
+	}
+	if len(ctrl.wakes) != 1 || ctrl.wakes[0] != "visit" {
+		t.Fatalf("wakes = %v", ctrl.wakes)
+	}
+	now = now.Add(tokenTTL + time.Second)
+	if code := postToken(s.Traffic(), "/_standby/visit", token); code != http.StatusForbidden || len(ctrl.wakes) != 1 {
+		t.Fatalf("expired token: %d, wakes %v", code, ctrl.wakes)
+	}
 }
 
 func TestStatusIsMinimalJSON(t *testing.T) {
@@ -128,10 +190,13 @@ func TestStatusIsMinimalJSON(t *testing.T) {
 }
 
 func TestAPIClientsGetJSON(t *testing.T) {
-	s, _ := newServer(t, nil)
+	s, ctrl := newServer(t, nil)
 	rec := get(s.Traffic(), "/api/items", "application/json")
 	if rec.Code != http.StatusServiceUnavailable || !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json") {
 		t.Fatalf("code %d, type %q", rec.Code, rec.Header().Get("Content-Type"))
+	}
+	if len(ctrl.wakes) != 0 {
+		t.Fatalf("an API call woke the stack: %v", ctrl.wakes)
 	}
 }
 
@@ -141,13 +206,7 @@ func TestButtonTokenIsSignedAndExpires(t *testing.T) {
 	s.Now = func() time.Time { return now }
 	tok := s.token()
 
-	post := func(token string) int {
-		req := httptest.NewRequest(http.MethodPost, "/_standby/wake", strings.NewReader(url.Values{"token": {token}}.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rec := httptest.NewRecorder()
-		s.Traffic().ServeHTTP(rec, req)
-		return rec.Code
-	}
+	post := func(token string) int { return postToken(s.Traffic(), "/_standby/wake", token) }
 	if code := post(tok + "x"); code != http.StatusForbidden {
 		t.Fatalf("tampered token: %d", code)
 	}
