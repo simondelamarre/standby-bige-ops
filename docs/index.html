@@ -148,7 +148,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--ink-70
 },
 "idle_after": "60m",
 "wake": { "on_visit": true, "button": false }</code></pre>
-<p class="note">Une visite la nuit réveille la stack une seule fois : les visiteurs suivants voient la progression, sans relancer le démarrage. <code>/robots.txt</code>, <code>/favicon.ico</code> et <code>/.well-known/</code> ne réveillent jamais rien, et des plafonds (réveils par jour, heures allumées par mois) bornent ce que les robots peuvent te coûter.</p>
+<p class="note">Une visite la nuit réveille la stack une seule fois : les visiteurs suivants voient la progression, sans relancer le démarrage. Seul un navigateur qui exécute la page d'attente réveille la stack : robots, appels d'API, webhooks et onglets cachés ne réveillent rien, et des plafonds (réveils par jour, heures allumées par mois) bornent ce que les robots peuvent te coûter.</p>
 
 <h2>Sûre par construction</h2>
 <ul class="arrows">
