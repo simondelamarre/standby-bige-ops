@@ -27,7 +27,7 @@ trust boundary.
 
 | Threat | Mitigation |
 |---|---|
-| Robots or attackers keep the stack awake | Wake-ups per day and awake hours per month are capped; a capped stack stays asleep and says so. Technical URLs never wake it. |
+| Robots or attackers keep the stack awake | Wake-ups per day and awake hours per month are capped; a capped stack stays asleep and says so. Only a visible waiting page run by a browser asks for a wake, with a signed token that expires; any other request wakes nothing. |
 | Wake storm from many visitors | A wake is started once; concurrent visits only read its progress. |
 | Guardian drives a machine it should not | Every call goes through an allowlist built from the manifest; ids are validated (`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`). |
 | Stolen guardian key | Least privilege (read, start, stop, tag). Worst case: an attacker can stop or start machines of the account, not read data nor delete anything. Keys expire and are rotated at each deploy. Whether the provider can restrict the key to specific machines is checked per driver. |

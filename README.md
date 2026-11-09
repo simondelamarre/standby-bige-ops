@@ -31,7 +31,9 @@ browser ──► load balancer ──► app VM ──► data VMs        (stac
   tiny probe on the app VM. An optional schedule keeps it awake during office
   hours.
 - **Wakes on the first visit.** No click needed; later visits show the progress
-  instead of starting it again. A start button is available as an option.
+  instead of starting it again. Only a browser running the waiting page wakes
+  the stack: robots, API calls and hidden tabs do not. A start button is
+  available as an option.
 - **Ordered.** Machines start in waves (databases first, then the app), each
   wave checked by real probes before the next one.
 - **Bounded.** Caps on wake-ups per day and awake hours per month limit what
@@ -119,7 +121,10 @@ the next visit (or on a click, if you prefer the button).
 }
 ```
 
-- `wake.on_visit: true` — a visit wakes the stack automatically.
+- `wake.on_visit: true` — a visit wakes the stack automatically, once the
+  browser runs the waiting page. Requests that do not run it (robots, webhooks,
+  background calls of a tab left open) get a 503 with `Retry-After` and wake
+  nothing. Visitors without JavaScript need the button.
 - `wake.on_visit: false, wake.button: true` — visitors click "Start".
 - `page.show_setup: true` — the waiting page and the status show these
   settings and the time left before the pause.
