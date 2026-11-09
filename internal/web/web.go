@@ -121,8 +121,9 @@ func (s *Server) Traffic() http.Handler {
 	mux.HandleFunc("GET /_standby/style.css", static(s.css, "text/css; charset=utf-8"))
 	mux.HandleFunc("GET /_standby/logo", s.serveLogo)
 	mux.HandleFunc("POST /_standby/wake", s.wakeButton)
+	mux.HandleFunc("POST /_standby/visit", s.wakeVisit)
 	mux.HandleFunc("/_standby/", http.NotFound)
-	// Technical URLs never wake the stack.
+	// Technical URLs get no waiting page.
 	mux.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = io.WriteString(w, "User-agent: *\nDisallow: /\n")
@@ -185,10 +186,10 @@ func (s *Server) status(w http.ResponseWriter, _ *http.Request) {
 	_ = json.NewEncoder(w).Encode(s.ctrl.Status())
 }
 
+// visit serves the waiting page and wakes nothing: robots, scanners and open
+// tabs reach this handler as well as people. The page asks for the wake once a
+// browser runs it, see wakeVisit.
 func (s *Server) visit(w http.ResponseWriter, r *http.Request) {
-	if s.wake.OnVisit {
-		s.ctrl.RequestWake("visit")
-	}
 	st := s.ctrl.Status()
 	retry := 30
 	if st.ETASeconds > 0 {
@@ -225,8 +226,8 @@ func (s *Server) visit(w http.ResponseWriter, r *http.Request) {
 			data.Reason = s.text.DefaultReason
 		}
 	}
-	if s.wake.Button {
-		data.Button = true
+	data.Button = s.wake.Button
+	if s.wake.Button || s.wake.OnVisit {
 		data.Token = s.token()
 	}
 	var buf bytes.Buffer
@@ -251,6 +252,21 @@ func (s *Server) wakeButton(w http.ResponseWriter, r *http.Request) {
 	}
 	s.ctrl.RequestWake("button")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// wakeVisit is called by the waiting page once a browser runs it.
+func (s *Server) wakeVisit(w http.ResponseWriter, r *http.Request) {
+	if !s.wake.OnVisit {
+		http.NotFound(w, r)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := r.ParseForm(); err != nil || !s.validToken(r.PostForm.Get("token")) {
+		http.Error(w, "expired page, reload it", http.StatusForbidden)
+		return
+	}
+	s.ctrl.RequestWake("visit")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // token is a timestamp signed with a per-process key, valid tokenTTL.

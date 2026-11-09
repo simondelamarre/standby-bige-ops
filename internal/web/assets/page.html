@@ -12,7 +12,7 @@
 </head>
 <body>
 <main id="standby"
-  data-visit="{{.Visit}}" data-show-eta="{{.ShowETA}}"
+  data-visit="{{.Visit}}" data-token="{{if .Visit}}{{.Token}}{{end}}" data-show-eta="{{.ShowETA}}"
   data-t-starting="{{.T.Starting}}" data-t-machines="{{.T.Machines}}" data-t-app="{{.T.App}}"
   data-t-eta="{{.T.ETA}}" data-t-soon="{{.T.Soon}}"
   data-t-ready="{{.T.Ready}}" data-t-slow="{{.T.Slow}}" data-t-cap="{{.T.Cap}}"

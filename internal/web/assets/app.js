@@ -1,4 +1,4 @@
-// Polls the public status and reloads the page once the app is back.
+// Asks for the wake, polls the public status and reloads the page once the app is back.
 (function () {
   "use strict";
   var root = document.getElementById("standby");
@@ -72,6 +72,26 @@
     etaEl.textContent = left > SOON_S ? d.tEta.replace("{s}", duration(left)) : d.tSoon;
   }
 
+  // Only a page someone is looking at asks for a wake.
+  function present() {
+    return d.visit === "true" && document.visibilityState === "visible";
+  }
+
+  function wake() {
+    return fetch("/_standby/visit", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "token=" + encodeURIComponent(d.token),
+      cache: "no-store",
+      credentials: "omit",
+    })
+      .then(function (r) {
+        // The token expires, and does not outlive a restart of the guardian.
+        if (r.status === 403) window.location.reload();
+      })
+      .catch(function () {}); // the next poll asks again
+  }
+
   function poll() {
     fetch("/_standby/status", { cache: "no-store", credentials: "omit" })
       .then(function (r) {
@@ -98,9 +118,11 @@
           setTimeout(poll, 1000);
           return;
         }
-        // A sleep just finished: a fresh visit wakes the stack again.
-        if (st.phase === "asleep" && d.visit === "true" && st.can_wake) {
-          window.location.reload();
+        // A sleep just finished, or the tab came back: someone is here, wake the stack.
+        if (st.phase === "asleep" && st.can_wake && present()) {
+          wake().then(function () {
+            setTimeout(poll, 1000);
+          });
           return;
         }
         if (btn) btn.disabled = !st.can_wake || (st.phase !== "asleep" && st.phase !== "failed");
@@ -119,5 +141,6 @@
   }
 
   setInterval(paint, 200);
-  poll();
+  if (present()) wake().then(poll);
+  else poll();
 })();
