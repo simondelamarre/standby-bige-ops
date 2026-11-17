@@ -1,0 +1,72 @@
+name: publish-image
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Derive immutable image tags
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "unsupported release tag: $GITHUB_REF_NAME" >&2
+            exit 1
+          }
+          version="${GITHUB_REF_NAME#v}"
+          minor="${version%.*}"
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/standby-bige-ops"
+          short_sha="${GITHUB_SHA:0:12}"
+          {
+            echo "image=${image}"
+            echo "version=${version}"
+            echo "minor=${minor}"
+            echo "short_sha=${short_sha}"
+          } >> "$GITHUB_OUTPUT"
+      - name: Login to GHCR
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Build and publish the public image
+        shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          VERSION: ${{ steps.image.outputs.version }}
+          MINOR: ${{ steps.image.outputs.minor }}
+          SHORT_SHA: ${{ steps.image.outputs.short_sha }}
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=mode=max \
+            --sbom=true \
+            --build-arg "VERSION=${VERSION}" \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${VERSION}" \
+            --tag "${IMAGE}:v${VERSION}" \
+            --tag "${IMAGE}:${VERSION}" \
+            --tag "${IMAGE}:${MINOR}" \
+            --tag "${IMAGE}:sha-${SHORT_SHA}" \
+            --tag "${IMAGE}:latest" \
+            --push .
+      - name: Record the published digest
+        shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          VERSION: ${{ steps.image.outputs.version }}
+        run: docker buildx imagetools inspect "${IMAGE}:v${VERSION}"

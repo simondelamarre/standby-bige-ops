@@ -1,6 +1,6 @@
-# One image for both roles: bige-ops builds it on the VMs at a pinned commit and
-# runs the tap in the app container's network namespace and the guardian with
-# the host network. The local demo uses it too.
+# One image for both roles. Tagged releases are published to the public GHCR;
+# bige-ops normally pulls a digest-pinned image and can rebuild this Dockerfile
+# from a pinned commit on the VM as an explicit recovery path.
 FROM golang:1.27.3-alpine AS build
 WORKDIR /src
 COPY go.mod ./

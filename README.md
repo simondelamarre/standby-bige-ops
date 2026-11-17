@@ -46,6 +46,21 @@ It is built for [bige-ops](https://bige.dev), which generates the manifest and
 the configuration from a simulation, but nothing here depends on bige-ops: a
 fork only needs a manifest and a configuration file.
 
+## Container image
+
+Each release publishes the same minimal image for the guardian and the activity
+tap to the public GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/simondelamarre/standby-bige-ops:latest
+docker pull ghcr.io/simondelamarre/standby-bige-ops:v0.1.1
+```
+
+`latest` is a convenient pointer to the latest stable release. Deployments
+should pin the immutable digest reported by GHCR; bige-ops does this by default.
+It can also rebuild the Dockerfile from the corresponding Git commit directly
+on the target VM as an explicit recovery path.
+
 ## Status
 
 Early development. The Docker driver runs the whole cycle locally and the
