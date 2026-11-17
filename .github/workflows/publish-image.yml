@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing vX.Y.Z tag to publish
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -17,23 +23,28 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+          ref: ${{ inputs.release_tag || github.ref }}
       - name: Derive immutable image tags
         id: image
         shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
           set -euo pipefail
-          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-            echo "unsupported release tag: $GITHUB_REF_NAME" >&2
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "unsupported release tag: $RELEASE_TAG" >&2
             exit 1
           }
-          version="${GITHUB_REF_NAME#v}"
+          version="${RELEASE_TAG#v}"
           minor="${version%.*}"
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/standby-bige-ops"
-          short_sha="${GITHUB_SHA:0:12}"
+          commit="$(git rev-parse HEAD)"
+          short_sha="${commit:0:12}"
           {
             echo "image=${image}"
             echo "version=${version}"
             echo "minor=${minor}"
+            echo "commit=${commit}"
             echo "short_sha=${short_sha}"
           } >> "$GITHUB_OUTPUT"
       - name: Login to GHCR
@@ -47,23 +58,24 @@ jobs:
           IMAGE: ${{ steps.image.outputs.image }}
           VERSION: ${{ steps.image.outputs.version }}
           MINOR: ${{ steps.image.outputs.minor }}
+          COMMIT: ${{ steps.image.outputs.commit }}
           SHORT_SHA: ${{ steps.image.outputs.short_sha }}
         run: |
           set -euo pipefail
-          docker buildx build \
-            --platform linux/amd64 \
-            --provenance=mode=max \
-            --sbom=true \
+          docker build \
             --build-arg "VERSION=${VERSION}" \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.revision=${COMMIT}" \
             --label "org.opencontainers.image.version=${VERSION}" \
             --tag "${IMAGE}:v${VERSION}" \
             --tag "${IMAGE}:${VERSION}" \
             --tag "${IMAGE}:${MINOR}" \
             --tag "${IMAGE}:sha-${SHORT_SHA}" \
             --tag "${IMAGE}:latest" \
-            --push .
+            .
+          for tag in "v${VERSION}" "${VERSION}" "${MINOR}" "sha-${SHORT_SHA}" latest; do
+            docker push "${IMAGE}:${tag}"
+          done
       - name: Record the published digest
         shell: bash
         env:
