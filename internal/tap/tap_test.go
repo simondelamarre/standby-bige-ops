@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -131,6 +132,71 @@ func TestActivityBeforeAnyTraffic(t *testing.T) {
 	var a activity
 	if err := json.NewDecoder(resp.Body).Decode(&a); err != nil || a.LastActiveUnix != 0 {
 		t.Fatalf("activity = %+v, %v", a, err)
+	}
+}
+
+func TestProxyForwardsIgnoredRequestsWithoutMovingTheActivityClock(t *testing.T) {
+	app := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-App-Path", r.URL.Path)
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer app.Close()
+	target, err := url.Parse(app.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule, err := ParseIgnoreRule("GET:/api/admin/workspace/*/queue-status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_800_000_000, 0)
+	tp := New(3000, app.URL+"/health")
+	tp.Now = func() time.Time { return now }
+	var ignored []string
+	tp.OnIgnore = func(rule IgnoreRule, req *http.Request) {
+		ignored = append(ignored, rule.String()+" "+req.URL.Path)
+	}
+	proxy := httptest.NewServer(tp.Proxy(target, []IgnoreRule{rule}))
+	defer proxy.Close()
+
+	resp, err := http.Get(proxy.URL + "/api/admin/workspace/acme/queue-status?refresh=true")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted || resp.Header.Get("X-App-Path") == "" {
+		t.Fatalf("ignored request was not forwarded: status=%d path=%q", resp.StatusCode, resp.Header.Get("X-App-Path"))
+	}
+	if !tp.last.IsZero() || tp.ignoredRequests != 1 || len(ignored) != 1 {
+		t.Fatalf("ignored request changed activity: last=%v ignored=%d log=%v", tp.last, tp.ignoredRequests, ignored)
+	}
+
+	req, _ := http.NewRequest(http.MethodPost, proxy.URL+"/api/admin/workspace/acme/queue-status", nil)
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if !tp.last.Equal(now) {
+		t.Fatalf("non-matching request did not count as activity: %v", tp.last)
+	}
+}
+
+func TestIgnoreRuleValidationAndMatching(t *testing.T) {
+	for _, bad := range []string{"", "/health", "GET:health", "GET:/**"} {
+		if _, err := ParseIgnoreRule(bad); err == nil {
+			t.Fatalf("ParseIgnoreRule(%q) succeeded", bad)
+		}
+	}
+	rule, err := ParseIgnoreRule("get:/wp-admin*")
+	if err != nil || rule.String() != "GET:/wp-admin*" {
+		t.Fatalf("rule = %+v, %v", rule, err)
+	}
+	if !rule.matches(httptest.NewRequest(http.MethodGet, "/wp-admin.php", nil)) {
+		t.Fatal("expected WordPress scanner path to match")
+	}
+	if rule.matches(httptest.NewRequest(http.MethodPost, "/wp-admin.php", nil)) {
+		t.Fatal("method-specific rule matched POST")
 	}
 }
 

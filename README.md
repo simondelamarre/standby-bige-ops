@@ -53,7 +53,7 @@ tap to the public GitHub Container Registry:
 
 ```bash
 docker pull ghcr.io/simondelamarre/standby-bige-ops:latest
-docker pull ghcr.io/simondelamarre/standby-bige-ops:v0.1.2
+docker pull ghcr.io/simondelamarre/standby-bige-ops:v0.2.0
 ```
 
 `latest` is a convenient pointer to the latest stable release. Deployments
@@ -167,6 +167,27 @@ machine-readable contract is [`schemas/tap.schema.json`](schemas/tap.schema.json
 so an orchestrator can expose the same option without inventing its own name or
 limits.
 
+For request-aware activity, the tap can run as a local reverse proxy. The load
+balancer targets the proxy port; every request is still forwarded to the app,
+but explicit technical routes can be excluded from the idle clock:
+
+```bash
+standby tap \
+  --app-port 3001 \
+  --proxy-listen :3002 \
+  --ignore-request 'GET:/api/admin/workspace/*/queue-status' \
+  --ignore-request 'GET:/wp-admin*'
+```
+
+This runs on the app VM and does not require Cloudflare, another CDN or an
+external WAF. Rules are an allowlist of traffic that is ignored for activity,
+not a firewall: matching requests reach the application unchanged and are
+logged with the rule that matched. `*` matches within one path segment; `**` is
+refused so a typo cannot silently ignore the whole application. A WebSocket
+handshake counts once, while the open socket does not keep moving the idle
+clock. The portable form contract is published in
+[`schemas/tap.schema.json`](schemas/tap.schema.json).
+
 ## Make the waiting page yours
 
 No fork, no HTML: a few variables in `page` make the page look like your app.
@@ -220,7 +241,7 @@ GitHub Pages.
 | Piece | Where it runs | Role |
 |---|---|---|
 | `standby run` | guardian VM | Reads the state from the cloud API, applies the schedule and the idle rule, starts and stops machines, serves the waiting page and its health endpoint |
-| `standby tap` | app VM | Counts incoming connections on the app port and answers the load balancer health check on a separate port, so health checks never count as traffic |
+| `standby tap` | app VM | Counts incoming connections, or locally proxies HTTP for request-aware rules, and answers the load balancer health check on a separate port so health checks never count as traffic |
 
 When several machines serve the app behind the load balancer, each runs its
 own tap and `tap.urls` lists them all. Traffic on any of them keeps the stack

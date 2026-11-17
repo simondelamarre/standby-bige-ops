@@ -23,6 +23,39 @@
       "default": ":9090",
       "description": "Address exposing /activity and /health."
     },
+    "proxy_listen": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Optional local HTTP reverse-proxy address. When set, the load balancer sends application traffic here and the tap forwards it to app_port. This enables request-aware activity rules without a CDN or external WAF."
+    },
+    "ignore_requests": {
+      "type": "array",
+      "default": [],
+      "description": "Requests forwarded to the app without refreshing the idle clock. Each item maps to one repeatable --ignore-request METHOD:/path/pattern flag.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["method", "path"],
+        "properties": {
+          "method": {
+            "type": "string",
+            "pattern": "^(\\*|[A-Z]+)$",
+            "default": "GET",
+            "description": "HTTP method or * for every method."
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^/(?!.*\\*\\*).+$",
+            "description": "Request path pattern. * matches inside one path segment; ** is refused to avoid accidental application-wide rules."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Human explanation kept by the orchestrator; it does not affect matching."
+          }
+        }
+      }
+    },
     "interval": {
       "type": "string",
       "default": "5s",
@@ -31,7 +64,7 @@
     "ignore_connections_after": {
       "type": ["string", "null"],
       "default": null,
-      "description": "Optional Go duration, at least 1m. A continuously-open connection is activity only for this long. New connections still count. Designed for idle WebSockets and abandoned browser tabs; null keeps the conservative default.",
+      "description": "Legacy TCP-mode option, at least 1m. A continuously-open connection is activity only for this long. Request-aware proxy mode counts the HTTP request or WebSocket handshake once and does not need this timeout.",
       "examples": ["2m"]
     },
     "exit_when_refused": {

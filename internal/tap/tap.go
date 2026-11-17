@@ -1,5 +1,6 @@
-// Package tap runs next to the app and tells the guardian when traffic last
-// reached it, without sitting in the request path.
+// Package tap runs next to the app and tells the guardian when meaningful
+// traffic last reached it. The legacy TCP mode stays outside the request path;
+// proxy mode forwards HTTP traffic and can ignore explicit technical routes.
 //
 // It counts established inbound TCP connections on the app port from
 // /proc/net/tcp and /proc/net/tcp6, ignoring loopback peers. It also answers
@@ -17,7 +18,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,13 +47,52 @@ type Tap struct {
 	// a new connection still records activity, but an abandoned browser tab
 	// cannot keep a stack awake forever.
 	IgnoreConnectionsAfter time.Duration
+	// OnIgnore receives requests that the proxy forwards without counting them
+	// as activity. It is intended for structured operational logs.
+	OnIgnore func(IgnoreRule, *http.Request)
 
-	client  *http.Client
-	mu      sync.Mutex
-	last    time.Time
-	conns   int
-	ignored int
-	seen    map[string]time.Time
+	client          *http.Client
+	mu              sync.Mutex
+	last            time.Time
+	conns           int
+	ignored         int
+	ignoredRequests int
+	seen            map[string]time.Time
+}
+
+// IgnoreRule excludes matching proxy requests from the activity clock. Path is
+// a shell-style path pattern: * matches one path segment and ** is deliberately
+// unsupported so a broad rule cannot hide an entire application by accident.
+type IgnoreRule struct {
+	Method string
+	Path   string
+}
+
+// ParseIgnoreRule parses METHOD:/path/*; METHOD may be *.
+func ParseIgnoreRule(value string) (IgnoreRule, error) {
+	method, pattern, ok := strings.Cut(strings.TrimSpace(value), ":")
+	method = strings.ToUpper(strings.TrimSpace(method))
+	pattern = strings.TrimSpace(pattern)
+	if !ok || method == "" || (method != "*" && strings.ContainsAny(method, " /\t\r\n")) {
+		return IgnoreRule{}, fmt.Errorf("invalid ignore request %q: expected METHOD:/path/pattern", value)
+	}
+	if !strings.HasPrefix(pattern, "/") || strings.Contains(pattern, "**") {
+		return IgnoreRule{}, fmt.Errorf("invalid ignore request %q: path must start with / and use single-segment * wildcards", value)
+	}
+	if _, err := path.Match(pattern, pattern); err != nil {
+		return IgnoreRule{}, fmt.Errorf("invalid ignore request %q: %w", value, err)
+	}
+	return IgnoreRule{Method: method, Path: pattern}, nil
+}
+
+func (r IgnoreRule) String() string { return r.Method + ":" + r.Path }
+
+func (r IgnoreRule) matches(req *http.Request) bool {
+	if r.Method != "*" && r.Method != req.Method {
+		return false
+	}
+	matched, _ := path.Match(r.Path, req.URL.Path)
+	return matched
 }
 
 func New(port int, appHealth string) *Tap {
@@ -70,6 +113,36 @@ func New(port int, appHealth string) *Tap {
 		client: &http.Client{Timeout: 3 * time.Second},
 		seen:   make(map[string]time.Time),
 	}
+}
+
+// RecordActivity moves the activity clock to now.
+func (t *Tap) RecordActivity() {
+	t.mu.Lock()
+	t.last = t.Now()
+	t.mu.Unlock()
+}
+
+// Proxy forwards every request to the local app. Matching rules affect only
+// the idle clock: they never block or rewrite application traffic.
+func (t *Tap) Proxy(target *url.URL, rules []IgnoreRule) http.Handler {
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		for _, rule := range rules {
+			if !rule.matches(req) {
+				continue
+			}
+			t.mu.Lock()
+			t.ignoredRequests++
+			t.mu.Unlock()
+			if t.OnIgnore != nil {
+				t.OnIgnore(rule, req)
+			}
+			proxy.ServeHTTP(w, req)
+			return
+		}
+		t.RecordActivity()
+		proxy.ServeHTTP(w, req)
+	})
 }
 
 // Sample reads the socket tables once.
@@ -175,6 +248,7 @@ type activity struct {
 	LastActiveUnix     int64 `json:"last_active_unix"`
 	Connections        int   `json:"connections"`
 	IgnoredConnections int   `json:"ignored_connections,omitempty"`
+	IgnoredRequests    int   `json:"ignored_requests,omitempty"`
 }
 
 // Handler serves GET /activity for the guardian and GET /health for the load balancer.
@@ -182,7 +256,7 @@ func (t *Tap) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /activity", func(w http.ResponseWriter, _ *http.Request) {
 		t.mu.Lock()
-		a := activity{Connections: t.conns, IgnoredConnections: t.ignored}
+		a := activity{Connections: t.conns, IgnoredConnections: t.ignored, IgnoredRequests: t.ignoredRequests}
 		if !t.last.IsZero() {
 			a.LastActiveUnix = t.last.Unix()
 		}
