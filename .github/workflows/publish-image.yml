@@ -52,7 +52,7 @@ jobs:
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-      - name: Build and publish the public image
+      - name: Build the public image
         shell: bash
         env:
           IMAGE: ${{ steps.image.outputs.image }}
@@ -73,6 +73,24 @@ jobs:
             --tag "${IMAGE}:sha-${SHORT_SHA}" \
             --tag "${IMAGE}:latest" \
             .
+      - name: Reject every detected CVE before publication
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.image }}:v${{ steps.image.outputs.version }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: false
+          vuln-type: os,library
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+      - name: Publish the scanned image
+        shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          VERSION: ${{ steps.image.outputs.version }}
+          MINOR: ${{ steps.image.outputs.minor }}
+          SHORT_SHA: ${{ steps.image.outputs.short_sha }}
+        run: |
+          set -euo pipefail
           for tag in "v${VERSION}" "${VERSION}" "${MINOR}" "sha-${SHORT_SHA}" latest; do
             docker push "${IMAGE}:${tag}"
           done
