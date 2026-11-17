@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -31,6 +32,14 @@ import (
 )
 
 var version = "dev"
+
+type stringListFlag []string
+
+func (values *stringListFlag) String() string { return fmt.Sprint([]string(*values)) }
+func (values *stringListFlag) Set(value string) error {
+	*values = append(*values, value)
+	return nil
+}
 
 const usage = `usage: standby <command> [flags]
 
@@ -234,8 +243,11 @@ func runTap(args []string) error {
 	port := fs.Int("app-port", 3000, "port the app listens on")
 	health := fs.String("app-health", "/health", "health path of the app, asked over loopback")
 	listen := fs.String("listen", ":9090", "address for /activity and /health")
+	proxyListen := fs.String("proxy-listen", "", "optional HTTP proxy address used for request-aware activity")
 	interval := fs.Duration("interval", 5*time.Second, "sampling interval")
 	ignoreConnectionsAfter := fs.Duration("ignore-connections-after", 0, "ignore one continuously-open app connection after this delay (0: never; useful for WebSockets)")
+	var ignoreRequests stringListFlag
+	fs.Var(&ignoreRequests, "ignore-request", "proxy request that does not count as activity, METHOD:/path/* (repeatable)")
 	refused := fs.Duration("exit-when-refused", 3*time.Minute, "leave when the app port refuses loopback connections for this long, so Docker restarts the tap on the app's current network (0: never)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -246,19 +258,46 @@ func runTap(args []string) error {
 	if *ignoreConnectionsAfter > 0 && *ignoreConnectionsAfter < time.Minute {
 		return fmt.Errorf("--ignore-connections-after must be 0 or at least 1m")
 	}
+	if len(ignoreRequests) > 0 && *proxyListen == "" {
+		return errors.New("--ignore-request requires --proxy-listen")
+	}
+	if *proxyListen != "" && *proxyListen == *listen {
+		return errors.New("--proxy-listen and --listen must be different")
+	}
+	rules := make([]tap.IgnoreRule, 0, len(ignoreRequests))
+	for _, raw := range ignoreRequests {
+		rule, err := tap.ParseIgnoreRule(raw)
+		if err != nil {
+			return err
+		}
+		rules = append(rules, rule)
+	}
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	t := tap.New(*port, fmt.Sprintf("http://127.0.0.1:%d%s", *port, *health))
 	t.IgnoreConnectionsAfter = *ignoreConnectionsAfter
+	t.OnIgnore = func(rule tap.IgnoreRule, req *http.Request) {
+		log.Info("request ignored for activity", "rule", rule.String(), "method", req.Method, "path", req.URL.Path)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	go t.Run(ctx, *interval, func(err error) { log.Warn("sample failed", "err", err) })
+	if *proxyListen == "" {
+		go t.Run(ctx, *interval, func(err error) { log.Warn("sample failed", "err", err) })
+	}
 	srv := newServer(*listen, t.Handler())
-	errc := make(chan error, 1)
-	go func() {
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			errc <- err
-		}
-	}()
+	servers := []*http.Server{srv}
+	if *proxyListen != "" {
+		target, _ := url.Parse(fmt.Sprintf("http://127.0.0.1:%d", *port))
+		servers = append(servers, newServer(*proxyListen, t.Proxy(target, rules)))
+	}
+	errc := make(chan error, len(servers))
+	for _, server := range servers {
+		server := server
+		go func() {
+			if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+				errc <- err
+			}
+		}()
+	}
 	if *refused > 0 {
 		go func() {
 			if err := t.WatchLoopback(ctx, *interval, *refused); err != nil {
@@ -266,12 +305,13 @@ func runTap(args []string) error {
 			}
 		}()
 	}
-	log.Info("tap started", "version", version, "app_port", *port, "ignore_connections_after", ignoreConnectionsAfter.String())
+	log.Info("tap started", "version", version, "app_port", *port, "proxy_listen", *proxyListen, "ignore_requests", len(rules), "ignore_connections_after", ignoreConnectionsAfter.String())
 	select {
 	case <-ctx.Done():
-		shutdown([]*http.Server{srv})
+		shutdown(servers)
 		return nil
 	case err := <-errc:
+		shutdown(servers)
 		return err
 	}
 }
