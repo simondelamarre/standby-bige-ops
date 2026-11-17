@@ -37,11 +37,19 @@ type Tap struct {
 	AppHealth string // e.g. http://127.0.0.1:3000/health
 	Now       func() time.Time
 	Dial      func(context.Context) error // connects to the app port over loopback
+	// IgnoreConnectionsAfter stops treating one continuously-open connection as
+	// fresh activity after this delay. It is disabled by default. This is useful
+	// for WebSockets and other long-lived connections behind a load balancer:
+	// a new connection still records activity, but an abandoned browser tab
+	// cannot keep a stack awake forever.
+	IgnoreConnectionsAfter time.Duration
 
-	client *http.Client
-	mu     sync.Mutex
-	last   time.Time
-	conns  int
+	client  *http.Client
+	mu      sync.Mutex
+	last    time.Time
+	conns   int
+	ignored int
+	seen    map[string]time.Time
 }
 
 func New(port int, appHealth string) *Tap {
@@ -60,12 +68,16 @@ func New(port int, appHealth string) *Tap {
 			return err
 		},
 		client: &http.Client{Timeout: 3 * time.Second},
+		seen:   make(map[string]time.Time),
 	}
 }
 
 // Sample reads the socket tables once.
 func (t *Tap) Sample() error {
+	now := t.Now()
 	total := 0
+	ignored := 0
+	live := make(map[string]bool)
 	var errs []error
 	for _, name := range t.Files {
 		f, err := os.Open(name)
@@ -76,18 +88,37 @@ func (t *Tap) Sample() error {
 			errs = append(errs, err)
 			continue
 		}
-		n, err := CountInbound(f, t.Port)
+		ids, err := inboundConnections(f, t.Port)
 		f.Close()
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", name, err))
 			continue
 		}
-		total += n
+		for _, id := range ids {
+			key := name + "|" + id
+			live[key] = true
+			first, ok := t.seen[key]
+			if !ok {
+				first = now
+				t.seen[key] = first
+			}
+			if t.IgnoreConnectionsAfter > 0 && now.Sub(first) >= t.IgnoreConnectionsAfter {
+				ignored++
+				continue
+			}
+			total++
+		}
 	}
 	t.mu.Lock()
+	for id := range t.seen {
+		if !live[id] {
+			delete(t.seen, id)
+		}
+	}
 	t.conns = total
+	t.ignored = ignored
 	if total > 0 {
-		t.last = t.Now()
+		t.last = now
 	}
 	t.mu.Unlock()
 	return errors.Join(errs...)
@@ -141,8 +172,9 @@ func (t *Tap) WatchLoopback(ctx context.Context, interval, after time.Duration) 
 }
 
 type activity struct {
-	LastActiveUnix int64 `json:"last_active_unix"`
-	Connections    int   `json:"connections"`
+	LastActiveUnix     int64 `json:"last_active_unix"`
+	Connections        int   `json:"connections"`
+	IgnoredConnections int   `json:"ignored_connections,omitempty"`
 }
 
 // Handler serves GET /activity for the guardian and GET /health for the load balancer.
@@ -150,7 +182,7 @@ func (t *Tap) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /activity", func(w http.ResponseWriter, _ *http.Request) {
 		t.mu.Lock()
-		a := activity{Connections: t.conns}
+		a := activity{Connections: t.conns, IgnoredConnections: t.ignored}
 		if !t.last.IsZero() {
 			a.LastActiveUnix = t.last.Unix()
 		}
@@ -182,8 +214,16 @@ func (t *Tap) Handler() http.Handler {
 // CountInbound counts established connections whose local port is port and
 // whose peer is not a loopback address.
 func CountInbound(r io.Reader, port int) (int, error) {
+	connections, err := inboundConnections(r, port)
+	return len(connections), err
+}
+
+// inboundConnections returns stable socket identities for established inbound
+// connections. Linux exposes the inode in the tenth column; the address pair is
+// a safe fallback for fixtures or older kernels.
+func inboundConnections(r io.Reader, port int) ([]string, error) {
 	sc := bufio.NewScanner(r)
-	n := 0
+	var connections []string
 	first := true
 	for sc.Scan() {
 		if first { // header line
@@ -202,9 +242,13 @@ func CountInbound(r io.Reader, port int) (int, error) {
 		if err != nil || rip.IsLoopback() {
 			continue
 		}
-		n++
+		id := fields[1] + ">" + fields[2]
+		if len(fields) > 9 && fields[9] != "0" {
+			id = fields[9]
+		}
+		connections = append(connections, id)
 	}
-	return n, sc.Err()
+	return connections, sc.Err()
 }
 
 // splitAddr decodes "0100007F:0BB8": a little-endian hex address and a hex port.

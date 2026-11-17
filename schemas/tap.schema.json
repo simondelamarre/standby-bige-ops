@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/simondelamarre/standby-bige-ops/schemas/tap.schema.json",
+  "title": "standby activity tap options",
+  "description": "Portable options for the activity probe. Orchestrators can use this schema to build their setup form and the standby tap command.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "app_port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "default": 3000,
+      "description": "TCP port exposed by the application."
+    },
+    "app_health": {
+      "type": "string",
+      "default": "/health",
+      "description": "HTTP health path asked over loopback."
+    },
+    "listen": {
+      "type": "string",
+      "default": ":9090",
+      "description": "Address exposing /activity and /health."
+    },
+    "interval": {
+      "type": "string",
+      "default": "5s",
+      "description": "Go duration between socket samples."
+    },
+    "ignore_connections_after": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Optional Go duration, at least 1m. A continuously-open connection is activity only for this long. New connections still count. Designed for idle WebSockets and abandoned browser tabs; null keeps the conservative default.",
+      "examples": ["2m"]
+    },
+    "exit_when_refused": {
+      "type": ["string", "null"],
+      "default": "3m",
+      "description": "Exit after the app port continuously refuses loopback connections so the container can rejoin a replaced app network. null disables it."
+    }
+  }
+}

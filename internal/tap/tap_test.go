@@ -60,6 +60,43 @@ func TestSampleAndActivityEndpoint(t *testing.T) {
 	}
 }
 
+func TestAContinuouslyOpenConnectionCanExpireWithoutHidingANewOne(t *testing.T) {
+	dir := t.TempDir()
+	f4 := filepath.Join(dir, "tcp")
+	if err := os.WriteFile(f4, []byte(tcp4), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_800_000_000, 0)
+	tp := New(3000, "http://127.0.0.1:1/health")
+	tp.Files = []string{f4}
+	tp.Now = func() time.Time { return now }
+	tp.IgnoreConnectionsAfter = 2 * time.Minute
+
+	if err := tp.Sample(); err != nil {
+		t.Fatal(err)
+	}
+	first := tp.last
+	now = now.Add(2 * time.Minute)
+	if err := tp.Sample(); err != nil {
+		t.Fatal(err)
+	}
+	if tp.conns != 0 || tp.ignored != 1 || !tp.last.Equal(first) {
+		t.Fatalf("expired connection: conns=%d ignored=%d last=%v, want 0, 1, %v", tp.conns, tp.ignored, tp.last, first)
+	}
+
+	// A reconnect has a different inode and is fresh activity again.
+	if err := os.WriteFile(f4, []byte(strings.Replace(tcp4, "        0 2 1 0 20", "        0 22 1 0 20", 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(time.Second)
+	if err := tp.Sample(); err != nil {
+		t.Fatal(err)
+	}
+	if tp.conns != 1 || tp.ignored != 0 || !tp.last.Equal(now) {
+		t.Fatalf("new connection: conns=%d ignored=%d last=%v, want 1, 0, %v", tp.conns, tp.ignored, tp.last, now)
+	}
+}
+
 func TestHealthMirrorsTheApp(t *testing.T) {
 	healthy := true
 	app := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

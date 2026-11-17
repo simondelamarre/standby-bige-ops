@@ -142,6 +142,16 @@ balancers keep their backend connections open for a while after the last
 request (about 60 s on an Outscale LBU, 30 s in the local demo),
 so the stack falls asleep `idle_after` plus that delay after the last request.
 
+Applications using long-lived WebSockets can opt into
+`standby tap --ignore-connections-after 2m`. One continuously-open connection
+then stops refreshing the idle clock after two minutes, while every reconnect
+is counted as new activity. The default remains conservative and never ignores
+an open connection. Pick a delay longer than the load balancer's normal backend
+keep-alive, and keep `idle_after` long enough for a genuinely active user. The
+machine-readable contract is [`schemas/tap.schema.json`](schemas/tap.schema.json)
+so an orchestrator can expose the same option without inventing its own name or
+limits.
+
 ## Make the waiting page yours
 
 No fork, no HTML: a few variables in `page` make the page look like your app.

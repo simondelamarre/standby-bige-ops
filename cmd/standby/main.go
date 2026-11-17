@@ -235,6 +235,7 @@ func runTap(args []string) error {
 	health := fs.String("app-health", "/health", "health path of the app, asked over loopback")
 	listen := fs.String("listen", ":9090", "address for /activity and /health")
 	interval := fs.Duration("interval", 5*time.Second, "sampling interval")
+	ignoreConnectionsAfter := fs.Duration("ignore-connections-after", 0, "ignore one continuously-open app connection after this delay (0: never; useful for WebSockets)")
 	refused := fs.Duration("exit-when-refused", 3*time.Minute, "leave when the app port refuses loopback connections for this long, so Docker restarts the tap on the app's current network (0: never)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -242,8 +243,12 @@ func runTap(args []string) error {
 	if *port < 1 || *port > 65535 {
 		return fmt.Errorf("invalid --app-port %d", *port)
 	}
+	if *ignoreConnectionsAfter > 0 && *ignoreConnectionsAfter < time.Minute {
+		return fmt.Errorf("--ignore-connections-after must be 0 or at least 1m")
+	}
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	t := tap.New(*port, fmt.Sprintf("http://127.0.0.1:%d%s", *port, *health))
+	t.IgnoreConnectionsAfter = *ignoreConnectionsAfter
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go t.Run(ctx, *interval, func(err error) { log.Warn("sample failed", "err", err) })
@@ -261,7 +266,7 @@ func runTap(args []string) error {
 			}
 		}()
 	}
-	log.Info("tap started", "version", version, "app_port", *port)
+	log.Info("tap started", "version", version, "app_port", *port, "ignore_connections_after", ignoreConnectionsAfter.String())
 	select {
 	case <-ctx.Done():
 		shutdown([]*http.Server{srv})
