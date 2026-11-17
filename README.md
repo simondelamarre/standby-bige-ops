@@ -53,7 +53,7 @@ tap to the public GitHub Container Registry:
 
 ```bash
 docker pull ghcr.io/simondelamarre/standby-bige-ops:latest
-docker pull ghcr.io/simondelamarre/standby-bige-ops:v0.1.1
+docker pull ghcr.io/simondelamarre/standby-bige-ops:v0.1.2
 ```
 
 `latest` is a convenient pointer to the latest stable release. Deployments

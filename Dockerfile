@@ -1,7 +1,7 @@
 # One image for both roles. Tagged releases are published to the public GHCR;
 # bige-ops normally pulls a digest-pinned image and can rebuild this Dockerfile
 # from a pinned commit on the VM as an explicit recovery path.
-FROM golang:1.27.3-alpine AS build
+FROM golang:1.27.4-alpine AS build
 WORKDIR /src
 COPY go.mod ./
 COPY cmd ./cmd
