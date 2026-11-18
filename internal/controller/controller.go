@@ -276,6 +276,7 @@ func (c *Controller) Tick(ctx context.Context) {
 	}
 	if activityErr == nil && activity.After(c.lastActivity) {
 		c.lastActivity = activity
+		c.opt.Log.Info("activity observed", "at", activity.UTC().Format(time.RFC3339))
 	}
 	inWindow := c.opt.Window != nil && c.opt.Window.Contains(now)
 	windowOpened := inWindow && !c.inWindow

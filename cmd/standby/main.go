@@ -278,6 +278,9 @@ func runTap(args []string) error {
 	t.OnIgnore = func(rule tap.IgnoreRule, req *http.Request) {
 		log.Info("request ignored for activity", "rule", rule.String(), "method", req.Method, "path", req.URL.Path)
 	}
+	t.OnActivity = func(req *http.Request) {
+		log.Info("request counted as activity", "method", req.Method, "path", req.URL.Path)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if *proxyListen == "" {
