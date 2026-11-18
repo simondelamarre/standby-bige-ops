@@ -50,6 +50,9 @@ type Tap struct {
 	// OnIgnore receives requests that the proxy forwards without counting them
 	// as activity. It is intended for structured operational logs.
 	OnIgnore func(IgnoreRule, *http.Request)
+	// OnActivity receives requests that the proxy counts as activity. It is
+	// intended for structured operational logs and must not mutate the request.
+	OnActivity func(*http.Request)
 
 	client          *http.Client
 	mu              sync.Mutex
@@ -141,6 +144,9 @@ func (t *Tap) Proxy(target *url.URL, rules []IgnoreRule) http.Handler {
 			return
 		}
 		t.RecordActivity()
+		if t.OnActivity != nil {
+			t.OnActivity(req)
+		}
 		proxy.ServeHTTP(w, req)
 	})
 }

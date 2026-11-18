@@ -153,8 +153,12 @@ func TestProxyForwardsIgnoredRequestsWithoutMovingTheActivityClock(t *testing.T)
 	tp := New(3000, app.URL+"/health")
 	tp.Now = func() time.Time { return now }
 	var ignored []string
+	var counted []string
 	tp.OnIgnore = func(rule IgnoreRule, req *http.Request) {
 		ignored = append(ignored, rule.String()+" "+req.URL.Path)
+	}
+	tp.OnActivity = func(req *http.Request) {
+		counted = append(counted, req.Method+" "+req.URL.Path)
 	}
 	proxy := httptest.NewServer(tp.Proxy(target, []IgnoreRule{rule}))
 	defer proxy.Close()
@@ -167,8 +171,8 @@ func TestProxyForwardsIgnoredRequestsWithoutMovingTheActivityClock(t *testing.T)
 	if resp.StatusCode != http.StatusAccepted || resp.Header.Get("X-App-Path") == "" {
 		t.Fatalf("ignored request was not forwarded: status=%d path=%q", resp.StatusCode, resp.Header.Get("X-App-Path"))
 	}
-	if !tp.last.IsZero() || tp.ignoredRequests != 1 || len(ignored) != 1 {
-		t.Fatalf("ignored request changed activity: last=%v ignored=%d log=%v", tp.last, tp.ignoredRequests, ignored)
+	if !tp.last.IsZero() || tp.ignoredRequests != 1 || len(ignored) != 1 || len(counted) != 0 {
+		t.Fatalf("ignored request changed activity: last=%v ignored=%d ignored_log=%v counted_log=%v", tp.last, tp.ignoredRequests, ignored, counted)
 	}
 
 	req, _ := http.NewRequest(http.MethodPost, proxy.URL+"/api/admin/workspace/acme/queue-status", nil)
@@ -179,6 +183,9 @@ func TestProxyForwardsIgnoredRequestsWithoutMovingTheActivityClock(t *testing.T)
 	resp.Body.Close()
 	if !tp.last.Equal(now) {
 		t.Fatalf("non-matching request did not count as activity: %v", tp.last)
+	}
+	if len(counted) != 1 || counted[0] != "POST /api/admin/workspace/acme/queue-status" {
+		t.Fatalf("non-matching request activity log = %v", counted)
 	}
 }
 
